@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Seven Sins of TIVIDY</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Special+Elite&display=swap">
+<style>
+/* Layout: a case-file dossier. One evidence strip per sin, stacked in the order the evidence lands. */
+:root {
+  color-scheme: dark;
+  --bg: #0b0d09;
+  --panel: #14170f;
+  --panel-2: #1c2016;
+  --panel-3: #252a1d;
+  --bone: #e9e2c9;
+  --muted: #a6a288;
+  --dim: #727058;
+  --grade: #c6b86c;
+  --grade-soft: rgba(198, 184, 108, 0.12);
+  --blood: #c0342a;
+  --blood-soft: rgba(192, 52, 42, 0.16);
+  --teal: #7f998b;
+  --shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.85);
+  --f-body: "Nunito", "Varela Round", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-case: "Special Elite", "Courier New", ui-monospace, monospace;
+  --r-lg: 28px;
+  --r-md: 18px;
+  --r-sm: 12px;
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(1100px 620px at 12% -8%, rgba(198, 184, 108, 0.13), transparent 62%),
+    radial-gradient(900px 700px at 105% 38%, rgba(122, 88, 44, 0.12), transparent 60%),
+    radial-gradient(800px 600px at -10% 92%, rgba(127, 153, 139, 0.08), transparent 60%),
+    var(--bg);
+  color: var(--bone);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.6;
+  padding-inline: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 50;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+}
+body::after {
+  content: ""; position: fixed; inset: -50%; pointer-events: none; z-index: 51;
+  opacity: .07; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: grain 1.2s steps(6) infinite;
+}
+@keyframes grain {
+  0% { transform: translate(0, 0); } 20% { transform: translate(-3%, 2%); } 40% { transform: translate(2%, -3%); }
+  60% { transform: translate(-2%, -1%); } 80% { transform: translate(3%, 2%); } 100% { transform: translate(0, 0); }
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 18px 80px; position: relative; z-index: 1; }
+
+/* ---------- nav ---------- */
+.nav {
+  position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); z-index: 20;
+  display: flex; justify-content: center; margin-bottom: 36px;
+}
+.nav-inner {
+  display: flex; gap: 4px; padding: 6px; border-radius: 999px;
+  background: rgba(20, 23, 15, 0.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(233, 226, 201, 0.06);
+  overflow-x: auto; max-width: 100%; scrollbar-width: none;
+}
+.nav-inner::-webkit-scrollbar { display: none; }
+.nav a {
+  color: var(--muted); text-decoration: none; font-weight: 800; font-size: 14px;
+  padding: 8px 16px; border-radius: 999px; white-space: nowrap;
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+.nav a:hover { color: var(--bone); background: var(--panel-3); }
+.nav a:focus-visible { outline: 2px solid var(--grade); outline-offset: 2px; }
+
+/* ---------- hero ---------- */
+.eyebrow {
+  font-family: var(--f-case); color: var(--grade); letter-spacing: .14em; text-transform: uppercase;
+  font-size: 13px; margin: 0 0 14px;
+}
+.hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; align-items: end; margin-bottom: 26px; }
+.hero h1 {
+  font-family: var(--f-case); font-size: clamp(44px, 8.2vw, 94px); line-height: 1; font-weight: 400; letter-spacing: -0.01em;
+  margin: 0 0 18px; text-wrap: balance;
+}
+.hero h1 .red { color: var(--blood); }
+.hero h1 .flick { display: inline-block; animation: flicker 2.4s .3s both; }
+@keyframes flicker {
+  0% { opacity: 0; } 8% { opacity: 1; } 10% { opacity: .2; } 13% { opacity: 1; } 40% { opacity: 1; } 42% { opacity: .55; } 44% { opacity: 1; } 100% { opacity: 1; }
+}
+.lede { color: var(--muted); font-size: 18px; max-width: 56ch; margin: 0; font-weight: 600; }
+.lede strong { color: var(--bone); }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat {
+  background: var(--panel); border-radius: var(--r-md); padding: 16px 18px;
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(233,226,201,.05);
+}
+.stat .k { font-family: var(--f-case); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.stat .v { font-size: 30px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.stat .s { color: var(--muted); font-size: 13px; font-weight: 700; }
+.stat.wide { grid-column: 1 / -1; }
+
+/* ---------- case details ---------- */
+.details {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
+  background: var(--panel); border-radius: var(--r-lg); padding: 14px; margin-bottom: 72px;
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(233,226,201,.05);
+}
+.field { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; min-width: 0; }
+.field label { font-family: var(--f-case); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+.field .row { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.field .open-link { color: var(--grade); font-weight: 800; font-size: 13px; text-decoration: none; white-space: nowrap; }
+.field .open-link:hover { text-decoration: underline; }
+
+input[type="text"], input[type="url"] {
+  width: 100%; min-width: 0; font: inherit; font-weight: 700; color: var(--bone);
+  background: var(--panel-2); border: 0; border-radius: var(--r-sm); padding: 10px 14px;
+  box-shadow: inset 0 0 0 1px rgba(233,226,201,.06);
+  transition: box-shadow .2s var(--ease), background .2s var(--ease);
+}
+input::placeholder { color: var(--dim); font-weight: 600; }
+input:focus { outline: none; box-shadow: inset 0 0 0 2px var(--grade); background: var(--panel-3); }
+input:disabled { opacity: .55; cursor: not-allowed; }
+
+.btn {
+  font: inherit; font-weight: 900; font-size: 14px; border: 0; cursor: pointer;
+  border-radius: 999px; padding: 10px 18px; white-space: nowrap;
+  transition: transform .15s var(--ease), background .2s var(--ease), color .2s var(--ease), box-shadow .2s;
+}
+.btn:active { transform: scale(.96); }
+.btn:focus-visible { outline: 2px solid var(--grade); outline-offset: 2px; }
+.btn-red { background: var(--blood); color: #fff4ee; box-shadow: 0 8px 22px -10px var(--blood); }
+.btn-red:hover { background: #d23e33; }
+.btn-ghost { background: var(--panel-3); color: var(--muted); }
+.btn-ghost:hover { color: var(--bone); }
+.btn-ghost.arm { background: var(--blood-soft); color: #f0a49c; }
+.btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+/* ---------- sections ---------- */
+section { margin-bottom: 88px; scroll-margin-top: 90px; }
+.sec-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+.sec-head h2 { font-size: clamp(32px, 5vw, 52px); font-weight: 900; letter-spacing: -0.03em; line-height: 1; margin: 0; text-wrap: balance; }
+.sec-head p { color: var(--muted); margin: 0; max-width: 52ch; font-weight: 600; }
+
+/* ---------- the seven ---------- */
+.seven { display: grid; gap: 14px; }
+.sin {
+  display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 26px;
+  background: var(--panel); border-radius: var(--r-lg); padding: 24px;
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(233,226,201,.05);
+  position: relative; overflow: hidden;
+  transition: transform .3s var(--ease), box-shadow .3s var(--ease), background .3s var(--ease);
+  animation: rise .6s var(--ease) both; animation-delay: calc(var(--i) * 70ms + 150ms);
+}
+.sin::before {
+  content: attr(data-num); position: absolute; right: -8px; bottom: -48px;
+  font-family: var(--f-case); font-size: 200px; line-height: 1; color: rgba(198,184,108,.035); pointer-events: none;
+}
+.sin:hover { transform: translateY(-3px); background: #171b11; box-shadow: 0 28px 50px -24px rgba(0,0,0,.95), inset 0 0 0 1px rgba(198,184,108,.12); }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+.sin-head { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.case-no { font-family: var(--f-case); color: var(--dim); font-size: 13px; letter-spacing: .14em; }
+.sin-name { font-size: 40px; font-weight: 900; color: var(--blood); letter-spacing: -0.02em; line-height: 1.05; margin: 2px 0 0; text-transform: uppercase; }
+.role { font-weight: 900; font-size: 17px; margin: 4px 0 0; }
+.motto { color: var(--muted); font-size: 14px; font-weight: 600; margin: 6px 0 0; }
+
+.sin-body { display: grid; gap: 14px; min-width: 0; align-content: start; }
+.label {
+  font-family: var(--f-case); font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--grade); display: block; margin-bottom: 4px;
+}
+.sin-body ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.sin-body li { position: relative; padding-left: 18px; font-weight: 600; font-size: 15px; }
+.sin-body li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 7px; height: 7px; border-radius: 50%; background: var(--grade-deep, #6b6a36); background: rgba(198,184,108,.45); }
+.diagram-pill {
+  display: inline-flex; align-items: center; gap: 10px; background: var(--grade-soft); color: var(--bone);
+  border-radius: var(--r-sm); padding: 8px 14px; font-weight: 800; font-size: 15px;
+}
+.diagram-pill .tag { font-family: var(--f-case); color: var(--grade); font-size: 12px; letter-spacing: .1em; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800;
+  background: var(--panel-3); color: var(--muted); border-radius: 999px; padding: 4px 12px; white-space: nowrap;
+}
+.chip b { color: var(--bone); font-weight: 900; }
+
+
+.everyone {
+  margin-top: 14px; border-radius: var(--r-lg); padding: 24px;
+  background: linear-gradient(135deg, rgba(198,184,108,.10), rgba(192,52,42,.06));
+  box-shadow: inset 0 0 0 1px rgba(198,184,108,.14);
+  display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 26px;
+}
+.everyone h3 { margin: 0; font-size: 26px; font-weight: 900; line-height: 1.1; }
+.everyone ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; }
+.everyone li { font-weight: 600; font-size: 15px; padding-left: 18px; position: relative; }
+.everyone li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 7px; height: 7px; border-radius: 50%; background: var(--blood); }
+
+
+.who {
+  flex: none; text-align: center; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em;
+  border-radius: 999px; padding: 3px 10px; background: var(--blood-soft); color: #f0a49c; white-space: nowrap;
+}
+.who.all { background: var(--grade-soft); color: var(--grade); }
+
+/* ---------- workflow ---------- */
+.flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.step {
+  background: var(--panel); border-radius: var(--r-md); padding: 12px 16px;
+  box-shadow: inset 0 0 0 1px rgba(233,226,201,.06);
+}
+.step b { display: block; font-weight: 900; font-size: 15px; }
+.step span { font-size: 12px; font-weight: 800; color: #f0a49c; text-transform: uppercase; letter-spacing: .06em; }
+.arrow { color: var(--grade); font-weight: 900; font-size: 20px; }
+.flow-note { color: var(--muted); font-weight: 600; font-size: 14px; margin: 0 0 30px; }
+
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.card {
+  background: var(--panel); border-radius: var(--r-lg); padding: 24px; min-width: 0;
+  box-shadow: var(--shadow), inset 0 0 0 1px rgba(233,226,201,.05);
+}
+.card h3 { margin: 0 0 12px; font-size: 22px; font-weight: 900; }
+.card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.card li { font-weight: 600; font-size: 15px; padding-left: 18px; position: relative; }
+.card li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 7px; height: 7px; border-radius: 50%; background: rgba(198,184,108,.5); }
+code, pre { font-family: var(--f-case); }
+code { background: var(--panel-3); color: var(--grade); border-radius: 8px; padding: 1px 7px; font-size: .9em; word-break: break-word; }
+pre {
+  margin: 0; background: #0f110b; color: var(--bone); border-radius: var(--r-md); padding: 18px 20px;
+  font-size: 14px; line-height: 1.7; overflow-x: auto; box-shadow: inset 0 0 0 1px rgba(233,226,201,.05);
+}
+pre .c { color: var(--dim); }
+pre .g { color: var(--grade); }
+
+/* ---------- checklist ---------- */
+.progress { height: 12px; border-radius: 999px; background: var(--panel-3); overflow: hidden; margin-bottom: 18px; }
+.progress > i { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--grade), var(--blood)); transition: width .6s var(--ease); }
+.checks { display: grid; gap: 8px; }
+.check {
+  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 16px; align-items: center;
+  background: var(--panel); border-radius: var(--r-md); padding: 14px 18px; cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(233,226,201,.05);
+  transition: background .2s var(--ease), transform .15s var(--ease);
+}
+.check:hover { background: #171b11; }
+.check:active { transform: scale(.995); }
+.check input { position: absolute; opacity: 0; pointer-events: none; }
+.box {
+  width: 28px; height: 28px; border-radius: 10px; background: var(--panel-3); display: grid; place-items: center;
+  transition: background .25s var(--ease), transform .25s var(--ease);
+}
+.box svg { width: 16px; height: 16px; stroke: #fff4ee; stroke-width: 3.2; fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 22; stroke-dashoffset: 22; transition: stroke-dashoffset .3s var(--ease) .05s; }
+.check input:checked + .box { background: var(--blood); transform: scale(1.08); }
+.check input:checked + .box svg { stroke-dashoffset: 0; }
+.check input:focus-visible + .box { outline: 2px solid var(--grade); outline-offset: 3px; }
+.check input:disabled ~ * { cursor: not-allowed; }
+.check .txt { font-weight: 700; font-size: 15px; min-width: 0; }
+.check.done .txt { color: var(--dim); text-decoration: line-through; text-decoration-color: rgba(192,52,42,.6); text-decoration-thickness: 2px; }
+.check .owners { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.check .owners .who { min-width: 0; }
+
+/* ---------- rules ---------- */
+.rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; counter-reset: r; }
+.rule {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; align-items: start;
+  background: var(--panel); border-radius: var(--r-md); padding: 14px 18px; font-weight: 700; font-size: 15px;
+  box-shadow: inset 0 0 0 1px rgba(233,226,201,.05);
+}
+.rule .rn { font-family: var(--f-case); color: var(--blood); font-size: 22px; line-height: 1.1; }
+
+footer { color: var(--dim); font-family: var(--f-case); font-size: 13px; letter-spacing: .08em; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* ---------- toast ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); z-index: 60;
+  transform: translate(-50%, 140%); max-width: min(92vw, 520px);
+  background: var(--panel-3); color: var(--bone); font-weight: 800; font-size: 14px;
+  padding: 12px 20px; border-radius: 999px; box-shadow: 0 20px 40px -12px rgba(0,0,0,.9), inset 0 0 0 1px rgba(198,184,108,.2);
+  transition: transform .35s var(--ease);
+}
+.toast.show { transform: translate(-50%, 0); }
+
+
+.hero > *, .details { animation: rise .6s var(--ease) both; }
+.hero > :nth-child(2) { animation-delay: .12s; }
+.details { animation-delay: .2s; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 960px) {
+  .everyone { grid-template-columns: 1fr; gap: 14px; }
+}
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; }
+  .details { grid-template-columns: 1fr; }
+  .sin { grid-template-columns: 1fr; gap: 18px; padding: 20px; }
+  .sin::before { font-size: 150px; }
+  .everyone ul { grid-template-columns: 1fr; }
+  .grid2, .rules { grid-template-columns: 1fr; }
+  .check { grid-template-columns: auto minmax(0, 1fr); }
+  .check .owners { grid-column: 2; justify-content: flex-start; }
+  .who { min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav" aria-label="Sections">
+    <div class="nav-inner">
+      <a href="#seven">The Seven</a>
+      <a href="#workflow">Workflow</a>
+      <a href="#rules">Rules</a>
+      <a href="#checklist">Checklist</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <p class="eyebrow">COS 214 · Practical 6 · Case file 06</p>
+      <h1>Seven sins.<br><span class="red flick">One TIVIDY.</span></h1>
+      <p class="lede">The work split for the research and initial design phase. The brief asks for exactly <strong>seven diagrams</strong>, so each sin owns one diagram and one written piece. Choose your sin.</p>
+    </div>
+    <div class="stats">
+      <div class="stat">
+        <div class="k">Due</div>
+        <div class="v" id="daysLeft">7 days</div>
+        <div class="s">Tue 6 Oct 2026</div>
+      </div>
+      <div class="stat">
+        <div class="k">Final demo</div>
+        <div class="v">2 Nov</div>
+        <div class="s">Mon 2 Nov 2026</div>
+      </div>
+      <div class="stat wide">
+        <div class="k">Evidence</div>
+        <div class="v">7 diagrams · 1 PDF</div>
+        <div class="s">One diagram per sin</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="details" aria-label="Case details">
+    <div class="field">
+      <label for="f-leader">Group leader</label>
+      <input type="text" id="f-leader" maxlength="60" placeholder="Not yet elected" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="f-repo">GitHub repository</label>
+      <div class="row">
+        <input type="url" id="f-repo" maxlength="200" placeholder="https://github.com/…" autocomplete="off">
+        <a class="open-link" id="repoLink" href="#" target="_blank" rel="noopener" hidden>Open</a>
+      </div>
+    </div>
+    <div class="field">
+      <label for="f-tool">Diagram tool</label>
+      <input type="text" id="f-tool" maxlength="60" placeholder="Not yet agreed" autocomplete="off">
+    </div>
+  </div>
+
+  <section id="seven">
+    <div class="sec-head">
+      <h2>The Seven</h2>
+      <p>Listed in the order their evidence lands. Your work is checked by the sin after you, and Wrath is checked by Gluttony.</p>
+    </div>
+    <div class="seven" id="sevenList"></div>
+
+    <div class="everyone">
+      <h3>Every sin, every member</h3>
+      <ul>
+        <li>Understand the complete design. Anyone can be questioned on any part of it.</li>
+        <li>Draft the pattern justifications for the parts your diagram touches, and send them to Envy.</li>
+        <li>Review the pull requests of the sin before you.</li>
+        <li>Make meaningful commits across several days, not one dump at the end.</li>
+        <li>Post your daily report in the group chat.</li>
+        <li>Attend the weekly project check-ins.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="workflow">
+    <div class="sec-head">
+      <h2>How work moves</h2>
+      <p>Who waits on whom. Sloth's decisions log runs alongside all of it.</p>
+    </div>
+    <div class="flow" aria-label="Hand-off order">
+      <div class="step"><b>Research</b><span>Gluttony</span></div><span class="arrow">›</span>
+      <div class="step"><b>Scope &amp; scenario</b><span>Greed</span></div><span class="arrow">›</span>
+      <div class="step"><b>Activity diagrams</b><span>Gluttony · Sloth · Greed</span></div><span class="arrow">›</span>
+      <div class="step"><b>Class diagram</b><span>Pride</span></div><span class="arrow">›</span>
+      <div class="step"><b>Patterns, sequence, state</b><span>Envy · Wrath · Lust</span></div><span class="arrow">›</span>
+      <div class="step"><b>Audit</b><span>Wrath</span></div><span class="arrow">›</span>
+      <div class="step"><b>PDF</b><span>Wrath · Lust</span></div>
+    </div>
+    <p class="flow-note">The brief says to model behaviour before designing classes, and says important actions in the activity diagrams must trace to the class design. That is why the order runs this way.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <h3>Branches and commits</h3>
+        <ul>
+          <li><code>main</code> is protected. Nobody pushes to it directly.</li>
+          <li>Branch per piece of work: <code>sin/short-topic</code>, for example <code>greed/scenario-draft</code>.</li>
+          <li>Commit message: <code>[sin] area: what changed</code>, for example <code>[sloth] readme: add setup notes</code>.</li>
+          <li>Diagrams: commit the source file and an exported PNG or SVG together.</li>
+          <li>Small commits on several days. GitHub history is marked evidence.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Pull requests and review</h3>
+        <ul>
+          <li>Open a pull request when a draft is readable, not when it is perfect.</li>
+          <li>Your reviewer is the sin after you. Nothing merges without their approval.</li>
+          <li>After approval, the author merges their own PR.</li>
+          <li>Any change to a merged diagram gets an entry in the decisions log in the same PR.</li>
+          <li>Wrath can block any PR that makes two diagrams disagree.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Daily report</h3>
+        <p style="margin:0 0 12px;color:var(--muted);font-weight:600">Three lines in the group chat at the end of each working day.</p>
+<pre><span class="g">Done:</span>    what merged or moved today
+<span class="g">Next:</span>    what you pick up tomorrow
+<span class="g">Blocked:</span> who or what you are waiting on</pre>
+        <p style="margin:12px 0 0;color:var(--muted);font-weight:600;font-size:14px">Anything blocked for long goes to the group leader.</p>
+      </div>
+      <div class="card">
+        <h3>Repository layout</h3>
+<pre>tividy/
+├── README.md
+└── docs/
+    ├── research/      <span class="c">findings, references</span>
+    ├── scenario/      <span class="c">scope, scenario</span>
+    ├── diagrams/
+    │   ├── activity/
+    │   ├── class/
+    │   ├── sequence/
+    │   └── state/
+    ├── patterns.md    <span class="c">participant mapping</span>
+    ├── decisions.md   <span class="c">revision history</span>
+    ├── style-guide.md
+    └── contributions.md</pre>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3>Decisions log entry</h3>
+      <p style="margin:0 0 12px;color:var(--muted);font-weight:600">The five fields Task 7 asks for. One entry per meaningful change.</p>
+<pre><span class="g">## D-⟨number⟩ · ⟨date⟩ · ⟨sin⟩</span>
+<span class="g">Question:</span>   the problem or question being considered
+<span class="g">Before:</span>     the original design or assumption
+<span class="g">Change:</span>     the change that was made
+<span class="g">Why:</span>        why the change was made
+<span class="g">Diagrams:</span>   which diagrams were updated</pre>
+    </div>
+  </section>
+
+  <section id="rules">
+    <div class="sec-head">
+      <h2>The rules</h2>
+      <p>The brief's non-negotiables, in short. Break one and the whole case falls apart.</p>
+    </div>
+    <div class="rules" id="rulesList"></div>
+  </section>
+
+  <section id="checklist">
+    <div class="sec-head">
+      <h2>Submission checklist</h2>
+      <p>The PDF contents in the order the brief lists them, plus the repo. <b id="checkCount" style="color:var(--bone)">0 of 14</b> done.</p>
+    </div>
+    <div class="progress"><i id="checkBar"></i></div>
+    <div class="checks" id="checkList"></div>
+  </section>
+
+  <footer>
+    <span>Released 29 Sep 2026</span>
+    <span>Due 6 Oct 2026</span>
+    <span>Final demo 2 Nov 2026</span>
+  </footer>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SINS = [
+    { id: "gluttony", num: "I", name: "Gluttony", role: "The Reader",
+      motto: "Consumes every source so nobody else starts from zero.",
+      written: [
+        "Research findings (Task 1): about one page, at least four credible references.",
+        "Reference list and citation style for the whole PDF.",
+        "A short glossary so the team uses the same words for the same things."
+      ],
+      diagram: "Activity diagram 1", diagramNote: "Generic workflow execution, creation to final outcome" },
+    { id: "greed", num: "II", name: "Greed", role: "The Collector",
+      motto: "Hoards requirements. Nothing enters scope without Greed's say.",
+      written: [
+        "Initial system scope (Task 2): responsibilities, boundaries, definition vs instance, what varies.",
+        "Scenario description covering all nine points the brief lists.",
+        "Keeps the scenario from turning into the architecture."
+      ],
+      diagram: "Activity diagram 3", diagramNote: "The key workflow from your scenario" },
+    { id: "sloth", num: "III", name: "Sloth", role: "The Archivist",
+      motto: "Never rushes, never forgets. Keeps the record the markers read.",
+      written: [
+        "GitHub repo set-up: README, docs/ layout, branch protection, everyone invited.",
+        "Decisions and revision log (Task 7), kept current all project long.",
+        "Team details and repo link page of the PDF."
+      ],
+      diagram: "Activity diagram 2", diagramNote: "A second generic workflow the team picks" },
+    { id: "lust", num: "IV", name: "Lust", role: "The Stylist",
+      motto: "Wants it all to look like one team drew it.",
+      written: [
+        "Diagram style guide: one tool, one notation, shared colours and legend rules, export format.",
+        "Contribution log and the team contribution statement.",
+        "PDF layout and formatting."
+      ],
+      diagram: "State diagram", diagramNote: "Lifecycle of the runtime object the team chooses" },
+    { id: "pride", num: "V", name: "Pride", role: "The Architect",
+      motto: "Holds the centrepiece. Every other diagram has to agree with it.",
+      written: [
+        "Complete class diagram (Task 5): relationships, multiplicities, ownership, colour legend.",
+        "Design rationale write-up for the initial scope section.",
+        "Keeps the design as small as it can reasonably be."
+      ],
+      diagram: "Class diagram", diagramNote: "The big one, drawn from scratch" },
+    { id: "envy", num: "VI", name: "Envy", role: "The Comparer",
+      motto: "Looks at everyone else's work and asks if it earns its place.",
+      written: [
+        "Pattern participant mapping and justifications (Task 4): owns the five-field template.",
+        "Collects every member's drafts and sends back generic justifications.",
+        "Counts: at least ten patterns, each tied to a real TIVIDY problem."
+      ],
+      diagram: "Sequence diagram 1", diagramNote: "An interaction across several parts of the design" },
+    { id: "wrath", num: "VII", name: "Wrath", role: "The Enforcer",
+      motto: "Hunts contradictions between diagrams and shows no mercy.",
+      written: [
+        "Consistency and traceability audit: activity actions map to classes, runtime diagrams match the class diagram.",
+        "Final PDF assembly in the brief's order.",
+        "Submits, with time to spare."
+      ],
+      diagram: "Sequence diagram 2", diagramNote: "A second interaction across the design" }
+  ];
+  var BY_ID = {};
+  SINS.forEach(function (s, i) { s.idx = i; BY_ID[s.id] = s; });
+  function reviewerOf(s) { return SINS[(s.idx + 1) % SINS.length]; }
+
+  var CHECKS = [
+    { id: "c01", t: "Team details and GitHub repository link", o: ["sloth"] },
+    { id: "c02", t: "Research findings and references", o: ["gluttony"] },
+    { id: "c03", t: "Selected scenario description", o: ["greed"] },
+    { id: "c04", t: "Initial system scope and design rationale", o: ["greed", "pride"] },
+    { id: "c05", t: "Three UML activity diagrams (fork/join, called activity, swimlanes across them)", o: ["gluttony", "sloth", "greed"] },
+    { id: "c06", t: "Complete UML class diagram with colour legend", o: ["pride"] },
+    { id: "c07", t: "GoF participant mapping and pattern justifications", o: ["envy"] },
+    { id: "c08", t: "Two UML sequence diagrams", o: ["envy", "wrath"] },
+    { id: "c09", t: "One UML state diagram", o: ["lust"] },
+    { id: "c10", t: "Design decisions and revision history", o: ["sloth"] },
+    { id: "c11", t: "Team contribution statement", o: ["lust"] },
+    { id: "c12", t: "Repo has README, docs/, research, UML exports and the decisions log", o: ["sloth"] },
+    { id: "c13", t: "Every member has meaningful commits on several days", o: ["all"] },
+    { id: "c14", t: "One PDF submitted", o: ["wrath"] }
+  ];
+
+  var RULES = [
+    "Team of 5 or 7. Every member understands the complete design.",
+    "TIVIDY is a generic workflow management system.",
+    "The scenario does not decide the whole architecture.",
+    "At least 10 meaningful GoF patterns in the final project.",
+    "Patterns solve real problems inside one coherent system.",
+    "No big if/else chains, giant switches or manual type checks in place of polymorphism.",
+    "All UML diagrams agree with one another.",
+    "Ownership and lifetime relationships are clear.",
+    "Important runtime behaviour is visible in the diagrams.",
+    "Important design changes are documented.",
+    "GitHub shows genuine work over time from the whole group.",
+    "No complete implementation is needed for Practical 6."
+  ];
+
+  // ---------- state (saved in this browser) ----------
+  var checks = {}, meta = {};
+  var LS_KEY = "tividy-sins-v2";
+  function loadLocal() { try { var v = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); checks = v.checks || {}; meta = v.meta || {}; } catch (e) {} }
+  function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify({ checks: checks, meta: meta })); } catch (e) {} }
+  var $ = function (id) { return document.getElementById(id); };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  // ---------- toast ----------
+  var toastTimer;
+  function toast(msg) {
+    var t = $("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2600);
+  }
+
+  // ---------- dates ----------
+  function todayJHB() {
+    try { return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg" }).format(new Date()); }
+    catch (e) { return new Date().toISOString().slice(0, 10); }
+  }
+  function dayDiff(a, b) {
+    var pa = a.split("-").map(Number), pb = b.split("-").map(Number);
+    return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 86400000);
+  }
+  var TODAY = todayJHB();
+  (function () {
+    var n = dayDiff(TODAY, "2026-10-06");
+    $("daysLeft").textContent = n > 1 ? n + " days" : n === 1 ? "Tomorrow" : n === 0 ? "Today" : "Handed in";
+  })();
+
+  // ---------- render: sins ----------
+  function renderSins() {
+    var list = $("sevenList");
+    SINS.forEach(function (s) {
+      var a = el("article", "sin"); a.id = "sin-" + s.id; a.dataset.num = s.num; a.style.setProperty("--i", s.idx);
+      var head = el("div", "sin-head");
+      head.appendChild(el("span", "case-no", "SIN " + s.num + " OF VII"));
+      head.appendChild(el("h3", "sin-name", s.name));
+      head.appendChild(el("p", "role", s.role));
+      head.appendChild(el("p", "motto", s.motto));
+
+      var body = el("div", "sin-body");
+      var w = el("div"); w.appendChild(el("span", "label", "Written"));
+      var ul = el("ul"); s.written.forEach(function (x) { ul.appendChild(el("li", null, x)); }); w.appendChild(ul);
+      var d = el("div"); d.appendChild(el("span", "label", "Diagram"));
+      var pill = el("span", "diagram-pill"); pill.appendChild(el("span", null, s.diagram)); pill.appendChild(el("span", "tag", s.diagramNote)); d.appendChild(pill);
+      var chips = el("div", "chips");
+      var c2 = el("span", "chip"); c2.appendChild(document.createTextNode("Reviewed by ")); c2.appendChild(el("b", null, reviewerOf(s).name)); chips.appendChild(c2);
+      body.appendChild(w); body.appendChild(d); body.appendChild(chips);
+
+      a.appendChild(head); a.appendChild(body);
+      list.appendChild(a);
+    });
+  }
+
+
+  function whoChip(id) {
+    if (id === "all") return el("span", "who all", "All");
+    return el("span", "who", BY_ID[id].name);
+  }
+
+  // ---------- render: checklist ----------
+  var TICK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  function renderChecks() {
+    var list = $("checkList"); list.textContent = "";
+    var done = 0;
+    CHECKS.forEach(function (c) {
+      var isDone = !!(checks[c.id] && checks[c.id].done);
+      if (isDone) done++;
+      var lab = el("label", "check" + (isDone ? " done" : ""));
+      var inp = el("input"); inp.type = "checkbox"; inp.id = "chk-" + c.id; inp.checked = isDone;
+      var box = el("span", "box"); box.innerHTML = TICK;
+      var txt = el("span", "txt", c.t);
+      var owners = el("span", "owners"); c.o.forEach(function (o) { owners.appendChild(whoChip(o)); });
+      inp.addEventListener("change", function () {
+        checks[c.id] = { done: inp.checked }; saveLocal(); renderChecks();
+        var f = $("chk-" + c.id); if (f) f.focus();
+      });
+      lab.appendChild(inp); lab.appendChild(box); lab.appendChild(txt); lab.appendChild(owners);
+      list.appendChild(lab);
+    });
+    $("checkCount").textContent = done + " of " + CHECKS.length;
+    $("checkBar").style.width = (done / CHECKS.length * 100) + "%";
+  }
+
+  function renderRules() {
+    var list = $("rulesList");
+    RULES.forEach(function (r, i) {
+      var d = el("div", "rule"); d.appendChild(el("span", "rn", String(i + 1).padStart(2, "0"))); d.appendChild(el("span", null, r)); list.appendChild(d);
+    });
+  }
+
+  // ---------- case details ----------
+  var FIELDS = [["f-leader", "leader"], ["f-repo", "repo"], ["f-tool", "tool"]];
+  function renderMeta() {
+    FIELDS.forEach(function (f) { var inp = $(f[0]); if (document.activeElement !== inp) inp.value = meta[f[1]] || ""; });
+    var repo = meta.repo || "", link = $("repoLink");
+    if (/^https:\/\/\S+$/i.test(repo)) { link.href = repo; link.hidden = false; } else { link.hidden = true; }
+  }
+  function saveMeta(key, value) {
+    value = value.trim();
+    if ((meta[key] || "") === value) return;
+    if (key === "repo" && value && !/^https:\/\//i.test(value)) { toast("Paste the full repository link, starting with https://"); return; }
+    meta[key] = value; saveLocal(); renderMeta(); toast("Saved");
+  }
+  FIELDS.forEach(function (f) {
+    var inp = $(f[0]);
+    inp.addEventListener("blur", function () { saveMeta(f[1], inp.value); });
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
+  });
+
+  // ---------- boot ----------
+  loadLocal();
+  renderSins(); renderRules();
+  renderChecks(); renderMeta();
+})();
+</script>
+
+</body>
+</html>
