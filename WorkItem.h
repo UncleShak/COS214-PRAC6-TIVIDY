@@ -1,6 +1,8 @@
 #ifndef WORK_ITEM_H
 #define WORK_ITEM_H
 
+// Leaf node and is a single unit of work
+
 #include "WorkflowComponent.h"
 #include "WorkItemState.h"
 #include "Participant.h"

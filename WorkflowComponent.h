@@ -1,6 +1,8 @@
 #ifndef WORKFLOW_COMPONENT_H
 #define WORKFLOW_COMPONENT_H
 
+// The generic base for individual tasks and a group of tasks
+
 #include <string>
 
 class WorkflowVisitor;
