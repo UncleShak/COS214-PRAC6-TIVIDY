@@ -8,6 +8,7 @@
 class WorkflowDefinition {
     public:
         virtual ~WorkflowDefinition() = default;
+        WorkflowDefinition(WorkflowComponent* root, const std::string& version);
         virtual WorkflowComponent* getRootStage() const = 0;
         virtual std::string getVersion() const = 0;
 };
