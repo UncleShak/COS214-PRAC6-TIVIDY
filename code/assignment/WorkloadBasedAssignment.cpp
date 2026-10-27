@@ -1,5 +1,6 @@
 #include "WorkloadBasedAssignment.h"
 #include "WorkItem.h"
+#include <cstddef>
 
 Participant* WorkloadBasedAssignment::assignParticipant(WorkItem* item, const std::vector<Participant*>& available) {
     if (item == nullptr) {
