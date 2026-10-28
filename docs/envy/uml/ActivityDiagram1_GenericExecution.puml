@@ -1,0 +1,87 @@
+@startuml ActivityDiagram1_GenericExecution
+' Activity Diagram 1 - Generic workflow execution (updated for the final project)
+' Owner: Envy. Matches ProgressionTracker, RoutingRule, DataBasedRouting, DependencyGraph.
+skinparam defaultFontName Arial
+skinparam ActivityBackgroundColor #7FD3F7
+skinparam ActivityBorderColor #2B6F8E
+skinparam ActivityDiamondBackgroundColor #7FD3F7
+skinparam SwimlaneTitleFontStyle bold
+title Activity Diagram 1: Generic workflow execution
+
+|WorkflowEngine|
+start
+:Load WorkflowDefinition\n(routing rule, dependencies, entry items);
+:Create WorkflowInstance\n(own DataPayload + own ProgressionTracker);
+
+|ProgressionTracker|
+:start(): reach each entry item;
+partition "Reach work item" {
+  if (All prerequisites complete?\n(DependencyGraph::isSatisfied)) then ([yes])
+    :Add to available work;
+  else ([no])
+    :Add to waiting work;
+  endif
+}
+
+|WorkflowInstance|
+repeat :Make newly available WorkItems available\n(WorkItemState::makeAvailable);
+  :Assign each available WorkItem\n(AssignmentRule::assignParticipant);
+  :Participant starts and finishes a WorkItem\n(Command -> AccessControlProxy -> WorkItemState);
+  if (Work successful?) then ([failure])
+    :Handle failure\n(rejection / escalation activity);
+    detach
+  else ([success])
+  endif
+
+  |ProgressionTracker|
+  :complete(item, instanceData);
+  if (Item is available work?) then ([no])
+    :Refuse invalid action\n(std::logic_error, progress unchanged);
+    detach
+  else ([yes])
+  endif
+
+  |RoutingRule|
+  :determineNextWork(item, instanceData);
+  if (Item is a decision point?) then ([yes])
+    :Check branch guards in order\n(RoutingCondition::evaluate);
+    if (A guard holds?) then ([yes])
+      :Take first matching branch;
+    elseif (Default branch set?) then ([yes])
+      :Take default branch;
+    else ([no])
+      :Report routing error\n(std::runtime_error);
+      detach
+    endif
+  else ([no])
+    :Follow fixed path\n(sequence or parallel split);
+  endif
+
+  |ProgressionTracker|
+  :Mark item complete;
+  :Reach each nominated item\n(Reach work item, above);
+  :Release waiting items whose\nlast prerequisite just completed;
+
+  |WorkflowInstance|
+  fork
+    :Record RoutingDecision\nin history;
+  fork again
+    :Notify listeners\nof state change;
+  end fork
+repeat while (Available work remaining?) is ([yes])
+->[no];
+
+if (Waiting work remaining?) then ([yes])
+  :Instance stalled\n(isStalled): escalate;
+  stop
+else ([no])
+  :Complete WorkflowInstance;
+  stop
+endif
+
+legend right
+  Colour: Envy (dependencies, decisions, progression)
+  [guard] = condition on a transition
+  detach = flow continues in another activity
+endlegend
+@enduml
