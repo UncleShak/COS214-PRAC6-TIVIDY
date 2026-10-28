@@ -11,7 +11,7 @@ WorkflowDefinition::~WorkflowDefinition() {
     delete rootStage;
 }
 
-WorkFlowComponent* WorkflowDefinition::getRootStage() const {
+WorkflowComponent* WorkflowDefinition::getRootStage() const {
     return rootStage;
 }
 

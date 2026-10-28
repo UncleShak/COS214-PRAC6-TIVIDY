@@ -12,7 +12,7 @@ WorkItem::~WorkItem() {
 }
 
 std::string WorkItem::getName() const {
-    return name;
+    return itemName;
 }
 
 std::string WorkItem::getRequiredRole() const {
