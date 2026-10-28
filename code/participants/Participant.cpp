@@ -8,7 +8,7 @@ void Participant::addRole(const Role& role) {
 }
 
 bool Participant::hasRole(const std::string& roleName) const {
-    for (size_t i = 0; i < roles.size(); i++) {
+    for (int i = 0; i < roles.size(); i++) {
         if (roles[i].matches(roleName)) 
         return true;
     }
