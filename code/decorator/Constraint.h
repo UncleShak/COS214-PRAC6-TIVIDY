@@ -5,8 +5,7 @@
  * The class diagram names the type Constraint but does not define it (D-G7). Each industry
  * supplies its own constraints, for example "all required documents uploaded".
  *
- * @author Tanatswa Masiiwa (Gluttony)
- * @note Implemented with assistance from Claude (Anthropic AI), from the team's Practical 6 UML.
+ * @author N'des Junior Lungwangu (Gluttony)
  */
 #ifndef TIVIDY_CONSTRAINT_H
 #define TIVIDY_CONSTRAINT_H

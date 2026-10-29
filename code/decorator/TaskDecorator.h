@@ -9,13 +9,12 @@
  * Ownership: the decorator holds the component by aggregation (hollow diamond in the
  * class diagram). It does not delete the component; whoever built the structure owns it.
  *
- * @author Tanatswa Masiiwa (Gluttony)
- * @note Implemented with assistance from Claude (Anthropic AI), from the team's Practical 6 UML.
+ * @author N'des Junior Lungwangu (Gluttony)
  */
 #ifndef TIVIDY_TASK_DECORATOR_H
 #define TIVIDY_TASK_DECORATOR_H
 
-#include "../engine/WorkflowComponent.h"
+#include "../workflow/WorkflowComponent.h"
 
 /** @brief Abstract decorator: a WorkflowComponent that wraps exactly one other component. */
 class TaskDecorator : public WorkflowComponent {
@@ -29,14 +28,17 @@ public:
 
     /** @brief Forwards to the wrapped component. Concrete decorators add behaviour around it. */
     void request() override;
-    /** @brief Forwards unchanged. */
-    void proxyRequest() override;
     /** @brief Forwards unchanged, so visitors still reach the real work item. */
     void accept(WorkflowVisitor* v) override;
-    /** @brief Forwards unchanged. */
-    WorkflowIterator* createIterator() override;
     /** @brief Forwards unchanged, so a decorated item keeps its name. */
     std::string getName() const override;
+    /**
+     * @brief Forwards unchanged. A decorated Stage still takes children; a decorated
+     *        WorkItem still refuses them (std::logic_error).
+     */
+    void add(WorkflowComponent* c) override;
+    /** @brief Forwards unchanged. */
+    void remove(WorkflowComponent* c) override;
 
     /** @brief The component this decorator wraps. */
     WorkflowComponent* getComponent() const { return component; }

@@ -6,7 +6,7 @@
  * needs somewhere to read "now" from (D-G8). Injecting a Clock keeps time in whole units
  * (the diagram uses int) and lets tests control time exactly.
  *
- * @author Tanatswa Masiiwa (Gluttony)
+ * @author N'des Junior Lungwangu (Gluttony)
  * @note Implemented with assistance from Claude (Anthropic AI), from the team's Practical 6 UML.
  */
 #ifndef TIVIDY_CLOCK_H

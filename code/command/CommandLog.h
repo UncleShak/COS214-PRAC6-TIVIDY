@@ -7,8 +7,7 @@
  * CommandLog and call run(). It executes a command, keeps the ones that succeeded in order,
  * and leaves refused commands out of the log.
  *
- * @author Tanatswa Masiiwa (Gluttony)
- * @note Implemented with assistance from Claude (Anthropic AI), from the team's Practical 6 UML.
+ * @author N'des Junior Lungwangu (Gluttony)
  */
 #ifndef TIVIDY_COMMAND_LOG_H
 #define TIVIDY_COMMAND_LOG_H
@@ -25,7 +24,7 @@ public:
     /**
      * @brief Executes a command and, if it succeeds, keeps it in the log.
      * @param command The command to run. The log takes ownership.
-     * @throws Whatever the command throws (for example InvalidTransition); the failed
+     * @throws Whatever the command throws (for example std::logic_error from the states); the failed
      *         command is deleted and not logged.
      */
     void run(Command* command);

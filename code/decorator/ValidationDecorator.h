@@ -2,8 +2,7 @@
  * @file ValidationDecorator.h
  * @brief ConcreteDecorator: refuses to perform the work unless its constraint is satisfied.
  *
- * @author Tanatswa Masiiwa (Gluttony)
- * @note Implemented with assistance from Claude (Anthropic AI), from the team's Practical 6 UML.
+ * @author N'des Junior Lungwangu (Gluttony)
  */
 #ifndef TIVIDY_VALIDATION_DECORATOR_H
 #define TIVIDY_VALIDATION_DECORATOR_H

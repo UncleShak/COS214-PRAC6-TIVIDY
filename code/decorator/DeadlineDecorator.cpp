@@ -1,6 +1,6 @@
 #include "DeadlineDecorator.h"
 
-#include "../engine/WorkflowException.h"
+#include "../core/WorkflowException.h"
 #include "Clock.h"
 
 #include <stdexcept>

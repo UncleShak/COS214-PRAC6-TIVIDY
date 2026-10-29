@@ -1,6 +1,6 @@
 #include "ValidationDecorator.h"
 
-#include "../engine/WorkflowException.h"
+#include "../core/WorkflowException.h"
 #include "Constraint.h"
 
 #include <stdexcept>

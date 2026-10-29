@@ -22,6 +22,10 @@ class WorkItem : public WorkflowComponent{
         virtual ~WorkItem();
 
         std::string getName() const override;
+
+        // Decorator: ConcreteComponent. Performing the work means completing it, so
+        // decorators (validation, deadline, audit, retry) guard completion.
+        void request() override;
         std::string getRequiredRole() const;
 
         void changeState(WorkItemState* newState) ;

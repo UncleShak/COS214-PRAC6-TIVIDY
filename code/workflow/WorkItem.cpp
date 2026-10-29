@@ -2,6 +2,7 @@
 #include "WorkItemState.h"
 #include "CreatedState.h" // Default starting state
 #include "Event.h"        // For Observer notification
+#include <stdexcept>
 
 WorkItem::WorkItem(std::string name, std::string role) 
     : itemName(name),requiredRole(role), currentState(new CreatedState()), assignedParticipant(nullptr) {
@@ -61,6 +62,9 @@ void WorkItem::complete() { currentState->complete(this); }
 void WorkItem::reject() { currentState->reject(this); }
 void WorkItem::cancel() { currentState->cancel(this); }
 void WorkItem::escalate() { currentState->escalate(this); }
+
+// Decorator: the work a WorkItem performs is its own completion.
+void WorkItem::request() { complete(); }
 
 void WorkItem::add(WorkflowComponent*) {
     throw std::logic_error(

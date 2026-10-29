@@ -1,6 +1,6 @@
 #include "RetryDecorator.h"
 
-#include "../engine/WorkflowException.h"
+#include "../core/WorkflowException.h"
 
 #include <exception>
 #include <stdexcept>
@@ -19,8 +19,10 @@ void RetryDecorator::request() {
         try {
             TaskDecorator::request();
             return;
-        } catch (const WorkflowException&) {
-            throw;  // A refused action will be refused again: never retry it.
+        } catch (const std::logic_error&) {
+            // An illegal transition (from the states) or a failed rule (ValidationFailed,
+            // DeadlineExceeded) will fail again: never retry it.
+            throw;
         } catch (const std::exception&) {
             if (attemptsUsed >= maxAttempts) {
                 throw;

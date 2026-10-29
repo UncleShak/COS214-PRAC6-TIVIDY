@@ -6,8 +6,7 @@
  * This small interface keeps the decorator independent of how history is stored: Sloth's
  * history and audit class can implement it directly, or through an adapter.
  *
- * @author Tanatswa Masiiwa (Gluttony)
- * @note Implemented with assistance from Claude (Anthropic AI), from the team's Practical 6 UML.
+ * @author N'des Junior Lungwangu (Gluttony)
  */
 #ifndef TIVIDY_HISTORY_H
 #define TIVIDY_HISTORY_H

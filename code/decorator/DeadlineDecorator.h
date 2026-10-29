@@ -2,8 +2,7 @@
  * @file DeadlineDecorator.h
  * @brief ConcreteDecorator: gives work a due time and refuses late work so it can be escalated.
  *
- * @author Tanatswa Masiiwa (Gluttony)
- * @note Implemented with assistance from Claude (Anthropic AI), from the team's Practical 6 UML.
+ * @author N'des Junior Lungwangu (Gluttony)
  */
 #ifndef TIVIDY_DEADLINE_DECORATOR_H
 #define TIVIDY_DEADLINE_DECORATOR_H
@@ -35,6 +34,8 @@ public:
 
     int getDuration() const { return duration; }
     int getDueTime() const { return dueTime; }
+    void add(WorkflowComponent* c) override;
+    void remove(WorkflowComponent* c) override;
 
 private:
     int duration;
