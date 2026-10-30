@@ -1,5 +1,6 @@
 #include "ProgressionTracker.h"
 
+#include "AvailableWorkIterator.h"
 #include "KeyValuePayload.h"
 
 #include <algorithm>
@@ -161,6 +162,10 @@ bool ProgressionTracker::isRejected(const std::string& item) const { return reje
 bool ProgressionTracker::isCancelled(const std::string& item) const { return cancelled.count(item) > 0; }
 
 const std::vector<std::string>& ProgressionTracker::availableItems() const { return available; }
+std::unique_ptr<WorkflowIterator<std::string> > ProgressionTracker::createIterator() const {
+    return std::unique_ptr<WorkflowIterator<std::string> >(new AvailableWorkIterator(available));
+}
+
 const std::vector<std::string>& ProgressionTracker::waitingItems() const { return waiting; }
 const std::set<std::string>& ProgressionTracker::completedItems() const { return completed; }
 const std::set<std::string>& ProgressionTracker::rejectedItems() const { return rejected; }
