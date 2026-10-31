@@ -1,0 +1,37 @@
+industry 2
+start DuneSpiceHarvest
+as du-surveyor
+assign SurveyField to du-surveyor
+begin SurveyField
+complete SurveyField
+as du-ops
+assign ApproveHarvestPermit to du-ops
+begin ApproveHarvestPermit
+approvals
+approve APR-1
+assign DeployHarvester to du-chief
+assign DeployCarryall to du-pilot
+as du-chief
+cancel DeployCarryall
+begin DeployHarvester
+complete DeployHarvester
+as du-pilot
+begin DeployCarryall
+complete DeployCarryall
+as du-ops
+assign Harvest to du-chief
+as du-chief
+begin Harvest
+events
+event WORM_SIGN Wormsign! Thumper pattern at 2 km
+work
+as du-ops
+assign Evacuate to du-pilot
+as du-pilot
+begin Evacuate
+complete Evacuate
+undo
+complete Evacuate
+report
+history
+quit

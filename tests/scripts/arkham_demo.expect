@@ -1,0 +1,11 @@
+Started ArkhamExpress as AX-1
+Decision at CheckStock: [otherwise] -> RequestStock
+Decision at RequestStock: [stockReceived == yes] -> PreparePackage
+Parallel split: PreparePackage -> SelectDeliveryType, AssignDriver
+waiting:   Dispatch (needs AssignDriver)
+AX-1: 'Deliver' is overdue and was escalated
+Dorian Vale assigned 'Deliver' to Rook Calder (Escalated -> Assigned)
+Ada Clerkwell completed 'CloseOrder' (Started -> Completed). Instance complete.
+-- stage: Fulfilment --
+Connector: 'RequestStock' called requestStock
+completed: RequestStock

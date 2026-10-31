@@ -1,0 +1,53 @@
+industries
+industry 1
+start ArkhamExpress inStock=no quantity=3
+as ax-dm
+assign ReceiveOrder
+as ax-clerk
+begin ReceiveOrder
+complete ReceiveOrder
+begin ValidateOrder
+assign ValidateOrder to ax-clerk
+begin ValidateOrder
+complete ValidateOrder
+as ax-dm
+assign CheckStock to ax-wh
+as ax-wh
+begin CheckStock
+complete CheckStock
+as ax-dm
+assign RequestStock to ax-wh
+as ax-wh
+begin RequestStock
+complete RequestStock
+as ax-dm
+assign PreparePackage to ax-wh
+as ax-wh
+begin PreparePackage
+complete PreparePackage
+as ax-dm
+assign SelectDeliveryType to ax-dm
+begin SelectDeliveryType
+complete SelectDeliveryType
+items
+assign AssignDriver to ax-dm
+begin AssignDriver
+complete AssignDriver
+assign Dispatch to ax-drv
+as ax-drv
+begin Dispatch
+complete Dispatch
+advance 12
+items
+as ax-dm
+assign Deliver to ax-drv
+as ax-drv
+begin Deliver
+complete Deliver
+as ax-clerk
+assign CloseOrder to ax-clerk
+begin CloseOrder
+complete CloseOrder
+report
+history RequestStock
+quit
