@@ -3,22 +3,20 @@
 
 // Leaf node and is a single unit of work
 #include <string>
-#include "../observer/EventSource.h"
 #include "WorkflowComponent.h"
-#include "../state/WorkItemState.h"
+#include "WorkItemState.h"
+#include "EventSource.h"
 
 class Participant;
 class WorkflowVisitor;
 
-class WorkItem : public WorkflowComponent, public EventSource{
+// Observer: a WorkItem is the Subject; listeners hear every state change.
+class WorkItem : public WorkflowComponent, public EventSource {
     private:
     std::string itemName;
     std::string requiredRole;
     WorkItemState* currentState;
     Participant* assignedParticipant;
-
-    WorkItem(const WorkItem&);
-    WorkItem& operator=(const WorkItem&);
 
     public:
         WorkItem(std::string name, std::string requiredRole );
@@ -45,13 +43,23 @@ class WorkItem : public WorkflowComponent, public EventSource{
         void cancel();
         void escalate();
 
+        // Prototype: same name and role, fresh CreatedState, no assignee, no listeners.
+        WorkflowComponent* clone() const override;
+
+        // Engine-only operations that bypass the State rules on purpose:
+        // reopen() puts finished work back to Created for a retry loop (ProgressionResult::reopened);
+        // restoreState() is used by Memento rollback.
+        void reopen();
+        void restoreState(WorkItemState* state, Participant* assignee);
+
          // Composite interface
         void add(WorkflowComponent* component) override;
         void remove(WorkflowComponent* component) override;
         void accept(WorkflowVisitor* visitor) override;
 
         // observer pattern
-        void notifyListeners(Event* event);
+        using EventSource::notifyListeners;
+        void notifyListeners(Event* event); // takes ownership of event
 };
 
 #endif

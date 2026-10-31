@@ -17,7 +17,7 @@
 #include "ProgressReportVisitor.h"
 #include "WorkItem.h"
 #include "WorkItemState.h"
-#include "support/StageStandIn.h"
+#include "Stage.h"
 #include "support/StandInState.h"
 
 namespace {
@@ -166,7 +166,7 @@ TEST_CASE("audit report shows each item's state, holder and role in tree order")
     t.order.accept(&audit);
 
     REQUIRE(audit.lines().size() == 6);
-    CHECK(audit.lines()[0] == "-- stage --");
+    CHECK(audit.lines()[0] == "-- stage: Order --");
     CHECK(audit.lines()[1] == "ReceiveOrder | Started | Thandi | role: Clerk");
     CHECK(audit.lines()[2] == "ValidateOrder | Created | unassigned | role: Clerk");
     CHECK(audit.lines()[5] == "Dispatch | Created | unassigned | role: Driver");

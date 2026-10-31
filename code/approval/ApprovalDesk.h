@@ -86,6 +86,8 @@ public:
 
     /** @brief Read-only view of the pending requests. */
     std::vector<const ApprovalRequest*> pending() const;
+    /** @brief Every request, pending and decided, oldest first. */
+    std::vector<const ApprovalRequest*> all() const;
 
     /**
      * @brief Finds a request by id.

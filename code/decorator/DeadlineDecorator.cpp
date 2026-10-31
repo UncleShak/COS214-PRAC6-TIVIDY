@@ -26,3 +26,9 @@ void DeadlineDecorator::request() {
 }
 
 bool DeadlineDecorator::isOverdue() const { return clock->now() > dueTime; }
+
+// Declared in the header but never defined: a deadline adds nothing to structure, so these
+// forward to the wrapped component like any decorator.
+void DeadlineDecorator::add(WorkflowComponent* c) { TaskDecorator::add(c); }
+
+void DeadlineDecorator::remove(WorkflowComponent* c) { TaskDecorator::remove(c); }

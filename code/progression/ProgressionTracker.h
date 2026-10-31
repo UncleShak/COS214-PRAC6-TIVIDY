@@ -35,6 +35,17 @@ struct ProgressionResult {
     ProgressionResult() : instanceComplete(false) {}
 };
 
+/// Everything the tracker knows about progress, for Memento snapshots (InstanceSnapshot).
+struct ProgressionState {
+    bool started;
+    std::vector<std::string> available;
+    std::vector<std::string> waiting;
+    std::set<std::string> completed;
+    std::set<std::string> rejected;
+    std::set<std::string> cancelled;
+    ProgressionState() : started(false) {}
+};
+
 class ProgressionTracker {
 public:
     /// @throws std::invalid_argument if there are no entry items.
@@ -53,6 +64,15 @@ public:
     ProgressionResult reject(const std::string& item, const DataPayload& instanceData);
     /// Item abandoned (WorkItem -> CancelledState): no routing, removed from available/waiting.
     void cancel(const std::string& item);
+
+    /// Reaches an item outside the routing rule (an interrupt, e.g. an event opens an evacuation
+    /// step). Same rules as routing: waits on unmet prerequisites, reopens finished work.
+    /// @throws std::logic_error before start().
+    ProgressionResult activate(const std::string& item);
+
+    /// Memento support: copy out and put back the whole progress.
+    ProgressionState saveProgress() const;
+    void restoreProgress(const ProgressionState& state);
 
     /// Pointer-style overloads (team convention: WorkItem*, DataPayload*). Null payload = no data.
     /// @throws std::invalid_argument if item is null.

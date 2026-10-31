@@ -35,3 +35,9 @@ void Participant::workFinished() {
     if (workload > 0) 
     workload--;
 }
+
+std::vector<std::string> Participant::getRoleNames() const {
+    std::vector<std::string> names;
+    for (size_t i = 0; i < roles.size(); i++) names.push_back(roles[i].getName());
+    return names;
+}

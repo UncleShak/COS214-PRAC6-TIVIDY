@@ -190,10 +190,11 @@ TEST_CASE("Stage rejects null/self/duplicate and visits nested stages") {
     CHECK_THROWS_AS(root.add(&root), std::invalid_argument);
     Stage* inner = new Stage("inner"); root.add(inner);
     CHECK_THROWS_AS(root.add(inner), std::invalid_argument);
-    inner->add(new WorkItem("Leaf", "Clerk"));
+    WorkItem* leaf = new WorkItem("Leaf", "Clerk"); inner->add(leaf);
     Collect c; root.accept(&c); CHECK(c.stages == 2); CHECK(c.items.size() == 1);
     root.remove(inner); CHECK(root.getChildren().empty());
     CHECK_THROWS_AS(root.accept(nullptr), std::invalid_argument);
+    delete leaf; delete inner;   // removed from the tree, so the caller frees them
 }
 TEST_CASE("Repeated default configuration cannot leave phantom reachable targets") {
     MiniBuilder b; b.reset(); b.buildStructure(); b.buildRules();

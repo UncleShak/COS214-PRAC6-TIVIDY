@@ -178,3 +178,35 @@ std::vector<std::string> ProgressionTracker::unmetPrerequisites(const std::strin
 bool ProgressionTracker::isStarted() const { return started; }
 bool ProgressionTracker::isComplete() const { return started && available.empty() && waiting.empty(); }
 bool ProgressionTracker::isStalled() const { return started && available.empty() && !waiting.empty(); }
+
+ProgressionResult ProgressionTracker::activate(const std::string& item) {
+    if (!started) {
+        throw std::logic_error("ProgressionTracker: cannot activate '" + item + "' before the instance starts");
+    }
+    ProgressionResult result;
+    result.outcome = "Activated";
+    reach(item, result);
+    releaseWaiting(result);
+    result.instanceComplete = isComplete();
+    return result;
+}
+
+ProgressionState ProgressionTracker::saveProgress() const {
+    ProgressionState state;
+    state.started = started;
+    state.available = available;
+    state.waiting = waiting;
+    state.completed = completed;
+    state.rejected = rejected;
+    state.cancelled = cancelled;
+    return state;
+}
+
+void ProgressionTracker::restoreProgress(const ProgressionState& state) {
+    started = state.started;
+    available = state.available;
+    waiting = state.waiting;
+    completed = state.completed;
+    rejected = state.rejected;
+    cancelled = state.cancelled;
+}

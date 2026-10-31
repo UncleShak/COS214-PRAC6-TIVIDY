@@ -119,6 +119,12 @@ std::vector<const ApprovalRequest*> ApprovalDesk::pending() const {
     return result;
 }
 
+std::vector<const ApprovalRequest*> ApprovalDesk::all() const {
+    std::vector<const ApprovalRequest*> result;
+    for (std::size_t i = 0; i < requests.size(); ++i) result.push_back(requests[i].get());
+    return result;
+}
+
 const ApprovalRequest* ApprovalDesk::get(int requestId) const {
 
     for (std::size_t i = 0; i < requests.size(); ++i) {
