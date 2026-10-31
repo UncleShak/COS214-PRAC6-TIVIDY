@@ -4,7 +4,7 @@
  *
  * The first level in most chains. It reads only the value on the request, so it never
  * waits for a human. If the value exceeds maxValue, it delegates to its successor
- * (typically a RoleBasedApprover). See Section 7.3 of the plan.
+ * (typically a RoleBasedApprover).
  *
  * @author Leul Tamiru (Wrath)
  */
