@@ -271,6 +271,74 @@ StatusMessage InterfaceController::rejectApproval(const std::string& approvalId,
     }
 }
 
+std::vector<std::string> InterfaceController::eventTypes() const {
+    if (view_.industryId.empty()) {
+        return std::vector<std::string>();
+    }
+    try {
+        return engine_.eventTypes(view_.industryId);
+    } catch (...) {
+        return std::vector<std::string>();
+    }
+}
+
+StatusMessage InterfaceController::raiseEvent(const std::string& type, const std::string& description,
+                                              std::vector<std::string>& changes) {
+    changes.clear();
+    StatusMessage problem = requireInstance();
+    if (problem.isError()) {
+        return status_ = problem;
+    }
+    const std::string event = trim(type);
+    if (event.empty()) {
+        return status_ = StatusMessage::invalidInput("give the event type, for example: event WORM_SIGN");
+    }
+    if (!contains(eventTypes(), event)) {
+        return status_ = StatusMessage::invalidInput("this industry does not react to '" + event + "'");
+    }
+    try {
+        changes = engine_.raiseEvent(view_.instanceId, event, trim(description));
+    } catch (...) {
+        return refuse();
+    }
+    hasOutcome_ = false;
+    StatusMessage refreshed = refresh();
+    if (refreshed.isError()) {
+        return refreshed;
+    }
+    return status_ = StatusMessage::success(event + " raised" + (changes.empty() ? ", nothing changed" : ""));
+}
+
+std::string InterfaceController::nextUndo() const {
+    if (view_.instanceId.empty()) {
+        return "";
+    }
+    try {
+        return engine_.nextUndo(view_.instanceId);
+    } catch (...) {
+        return "";
+    }
+}
+
+StatusMessage InterfaceController::undo() {
+    StatusMessage problem = requireInstance();
+    if (problem.isError()) {
+        return status_ = problem;
+    }
+    std::string undone;
+    try {
+        undone = engine_.undo(view_.instanceId);
+    } catch (...) {
+        return refuse();
+    }
+    hasOutcome_ = false;
+    StatusMessage refreshed = refresh();
+    if (refreshed.isError()) {
+        return refreshed;
+    }
+    return status_ = StatusMessage::success("Undid: " + undone);
+}
+
 StatusMessage InterfaceController::advance(const std::string& unitsText, std::vector<std::string>& changes) {
     changes.clear();
     std::size_t index = 0;

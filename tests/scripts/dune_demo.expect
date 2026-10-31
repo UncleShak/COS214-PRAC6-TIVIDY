@@ -1,0 +1,10 @@
+Started DuneSpiceHarvest as RUN-1
+APR-1   Pending   'ApproveHarvestPermit' needs OperationsManager
+Decision at ApproveHarvestPermit: [permitGranted == yes] -> DeployHarvester, DeployCarryall
+! Access denied: Mara Voss may not cancel 'DeployCarryall'
+waiting:   Harvest (needs DeployCarryall)
+Harvest: Started -> Cancelled
+Evacuate: Created -> Available
+WORM_SIGN raised
+Undid: complete Evacuate
+Tobin Reyes completed 'Evacuate' (Started -> Completed). Instance complete.

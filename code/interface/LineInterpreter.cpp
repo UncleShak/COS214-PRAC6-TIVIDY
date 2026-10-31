@@ -128,6 +128,9 @@ Reply LineInterpreter::run(const std::string& line) {
     if (command == "approve") return decideApproval(true, args);
     if (command == "reject") return decideApproval(false, args);
     if (command == "advance") return advance(args);
+    if (command == "events") return listEvents();
+    if (command == "event") return raiseEvent(args);
+    if (command == "undo") return undo();
     if (command == "history") return history(args);
     if (command == "report") return report();
 
@@ -170,6 +173,10 @@ std::vector<std::string> LineInterpreter::helpText() {
         "  approve <id>                   approve a request, e.g. approve APR-1",
         "  reject <id> <reason>           reject a request",
         "  advance <units>                move the clock forward (deadlines)",
+        "Events and undo",
+        "  events                         events this industry reacts to",
+        "  event <TYPE> [what happened]   raise one, e.g. event WORM_SIGN thumper at 2 km",
+        "  undo                           reverse the last action in this instance",
         "Looking back",
         "  history [newest] [text]        history, optionally newest first or filtered",
         "  report                         progress, audit and overdue reports",
@@ -310,13 +317,16 @@ Reply LineInterpreter::start(const std::vector<std::string>& args) {
     for (std::size_t i = firstPair; i < args.size(); ++i) {
         std::size_t equals = args[i].find('=');
         if (equals != std::string::npos && equals > 0) {
-            currentKey = lower(args[i].substr(0, equals));
-            bool known = false;
+            // Field names are matched without case; values keep the field's own spelling.
+            const std::string typedKey = args[i].substr(0, equals);
+            currentKey.clear();
             for (std::size_t f = 0; f < fields.size(); ++f) {
-                known = known || fields[f].key == currentKey;
+                if (lower(fields[f].key) == lower(typedKey)) {
+                    currentKey = fields[f].key;
+                }
             }
-            if (!known) {
-                Reply reply = invalid("unknown field '" + currentKey + "'");
+            if (currentKey.empty()) {
+                Reply reply = invalid("unknown field '" + typedKey + "'");
                 reply.lines.push_back("Usage: " + usage);
                 return reply;
             }
@@ -535,6 +545,38 @@ Reply LineInterpreter::advance(const std::vector<std::string>& args) {
     for (std::size_t i = 0; i < reply.lines.size(); ++i) {
         reply.lines[i] = "  " + reply.lines[i];
     }
+    return reply;
+}
+
+Reply LineInterpreter::listEvents() {
+    Reply reply;
+    const std::vector<std::string> types = controller_.eventTypes();
+    if (types.empty()) {
+        reply.status = StatusMessage::info("This industry raises no events (choose an industry first)");
+        return reply;
+    }
+    for (std::size_t i = 0; i < types.size(); ++i) {
+        reply.lines.push_back("  " + types[i]);
+    }
+    reply.status = StatusMessage::info("Raise one with: event <TYPE> [what happened]");
+    return reply;
+}
+
+Reply LineInterpreter::raiseEvent(const std::vector<std::string>& args) {
+    if (args.empty()) {
+        return invalid("usage: event <TYPE> [what happened], e.g. event WORM_SIGN");
+    }
+    Reply reply;
+    reply.status = controller_.raiseEvent(args[0], joinWords(args, 1, args.size()), reply.lines);
+    for (std::size_t i = 0; i < reply.lines.size(); ++i) {
+        reply.lines[i] = "  " + reply.lines[i];
+    }
+    return reply;
+}
+
+Reply LineInterpreter::undo() {
+    Reply reply;
+    reply.status = controller_.undo();
     return reply;
 }
 

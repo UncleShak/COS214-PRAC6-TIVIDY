@@ -14,6 +14,7 @@ WINDOW* openModal(int height, int width) {
     width = std::min(width, COLS - 4);
     WINDOW* window = newwin(height, width, (LINES - height) / 2, (COLS - width) / 2);
     keypad(window, TRUE);
+    Theme::paint(window);
     return window;
 }
 
@@ -50,13 +51,54 @@ void putText(WINDOW* window, int y, int x, const std::string& text, Tone tone, i
     wattroff(window, attr);
 }
 
+void putGlyphs(WINDOW* window, int y, int x, const char* glyphs, Tone tone) {
+    if (y < 0 || y >= getmaxy(window) || x < 0 || x >= getmaxx(window)) {
+        return;
+    }
+    const int attr = Theme::attr(tone);
+    wattron(window, attr);
+    mvwaddstr(window, y, x, glyphs);
+    wattroff(window, attr);
+}
+
 void drawFrame(WINDOW* window, const std::string& title, bool focused) {
     int border = Theme::attr(focused ? Tone::Gold : Tone::Muted);
     wattron(window, border);
+#ifdef NCURSES_WIDECHAR
+    // Unicode box drawing (heavy when focused), not the terminal's line-drawing mode.
+    if (focused) {
+        wborder_set(window, WACS_T_VLINE, WACS_T_VLINE, WACS_T_HLINE, WACS_T_HLINE,
+                    WACS_T_ULCORNER, WACS_T_URCORNER, WACS_T_LLCORNER, WACS_T_LRCORNER);
+    } else {
+        wborder_set(window, WACS_VLINE, WACS_VLINE, WACS_HLINE, WACS_HLINE,
+                    WACS_ULCORNER, WACS_URCORNER, WACS_LLCORNER, WACS_LRCORNER);
+    }
+#else
     box(window, 0, 0);
+#endif
     wattroff(window, border);
     if (!title.empty()) {
-        putText(window, 0, 2, " " + title + " ", focused ? Tone::Gold : Tone::Bone);
+        // A slanted tab, like the Persona menu headers:  ◢ TITLE ◤
+        const std::string label = " " + title + " ";
+        const int room = getmaxx(window) - 7;
+        if (room > 4) {
+            putGlyphs(window, 0, 2, "\u25E2", focused ? Tone::Gold : Tone::Muted);
+            putText(window, 0, 3, label.substr(0, static_cast<std::size_t>(room)), focused ? Tone::Title : Tone::Strip, 1);
+            const int end = 3 + static_cast<int>(std::min(label.size(), static_cast<std::size_t>(room)));
+            putGlyphs(window, 0, end, "\u25E4", focused ? Tone::Gold : Tone::Muted);
+        }
+    }
+}
+
+void putRow(WINDOW* window, int y, int x, int width, const std::string& text, Tone tone, bool chosen) {
+    if (width <= 2) {
+        return;
+    }
+    if (chosen) {
+        putText(window, y, x, fit("  " + text, static_cast<std::size_t>(width)), Tone::Select, 0);
+        putGlyphs(window, y, x, "\u25B6", Tone::Select);
+    } else {
+        putText(window, y, x, fit("  " + text, static_cast<std::size_t>(width)), tone, 0);
     }
 }
 
@@ -99,14 +141,7 @@ int Dialog::menu(const std::string& title, const std::vector<Line>& entries, int
         for (int row = 0; row < visible && top + row < count; ++row) {
             const int index = top + row;
             const bool chosen = index == selected;
-            const std::string text = fit((chosen ? "> " : "  ") + entries[index].text, inner);
-            if (chosen) {
-                wattron(w, A_REVERSE);
-            }
-            putText(w, 1 + row, 2, text, chosen ? Tone::Gold : entries[index].tone, 2);
-            if (chosen) {
-                wattroff(w, A_REVERSE);
-            }
+            putRow(w, 1 + row, 2, inner, entries[index].text, entries[index].tone, chosen);
         }
         putText(w, getmaxy(w) - 2, 2, count > visible ? "Enter choose   Esc close   (more: scroll)"
                                                       : "Enter choose   Esc close", Tone::Muted, 2);
@@ -259,6 +294,47 @@ void Dialog::text(const std::string& title, const std::vector<Line>& lines) {
         }
     }
     delwin(w);
+}
+
+void Dialog::alert(const std::string& title, const std::string& subtitle, const std::vector<Line>& lines) {
+    WINDOW* w = newwin(LINES, COLS, 0, 0);
+    keypad(w, TRUE);
+    Theme::paint(w);
+    werase(w);
+
+    // Diagonal stripes above and below a red band, the title spaced out in the middle.
+    std::string stripes;
+    for (int i = 0; i < COLS; ++i) {
+        stripes += (i % 4 < 2) ? "\u2571" : " ";
+    }
+    const int band = std::max(1, LINES / 2 - 4);
+    putGlyphs(w, band - 2, 0, stripes.c_str(), Tone::Red);
+    for (int row = band; row < band + 5; ++row) {
+        putText(w, row, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Banner, 0);
+    }
+    std::string spaced;
+    for (std::size_t i = 0; i < title.size(); ++i) {
+        spaced += (title[i] == '_' ? ' ' : title[i]);
+        spaced += ' ';
+    }
+    const std::string heading = "!  " + spaced + " !";
+    putText(w, band + 1, std::max(0, (COLS - static_cast<int>(heading.size())) / 2), heading, Tone::Banner, 0);
+    putText(w, band + 3, std::max(0, (COLS - static_cast<int>(subtitle.size())) / 2), subtitle, Tone::Banner, 0);
+    putGlyphs(w, band + 6, 0, stripes.c_str(), Tone::Red);
+
+    int y = band + 8;
+    for (std::size_t i = 0; i < lines.size() && y < LINES - 2; ++i, ++y) {
+        putText(w, y, std::max(2, COLS / 2 - 24), lines[i].text, lines[i].tone, 2);
+    }
+    putText(w, LINES - 1, 2, "Press any key", Tone::Muted, 2);
+    wrefresh(w);
+
+    const int key = wgetch(w);
+    if (key == KEY_RESIZE) {
+        ungetch(KEY_RESIZE);
+    }
+    delwin(w);
+    touchwin(stdscr);
 }
 
 bool Dialog::form(const std::string& title, const std::vector<DataField>& fields,

@@ -1,18 +1,10 @@
 /**
  * @file Layout.h
- * @brief The ncurses windows (header, list, detail, body, status) and their sizes.
- *
- * @code
- *   row 0            header  (full width)
- *   rows 1..H-3      list (40%) | detail (60%)     or     body (full width)
- *   rows H-2..H-1    status: key hints, then the last message
- * @endcode
- *
- * The body window covers the same rows as list + detail. A screen draws either the two
- * panes (pickers, dashboard) or the body (history, reports), never both.
+ * @brief The ncurses windows of the front end, created from LayoutGeometry.
  *
  * Rebuilt from scratch on every terminal resize. Below the minimum size no windows exist
- * and the front end shows a "terminal too small" message instead.
+ * and the front end shows a "terminal too small" message instead. The menu window is null
+ * when the terminal is too narrow for it (see Geometry::kMenuMinCols).
  *
  * @author Shakir Alexander (Lust)
  */
@@ -21,27 +13,33 @@
 
 #include <curses.h>
 
+#include "LayoutGeometry.h"
+
 namespace tividy {
 namespace ui {
 
 /** @brief Owns the pane windows. Not copyable. */
 class Layout {
 public:
-    static const int kMinCols = 100;
-    static const int kMinRows = 30;
+    static const int kMinCols = Geometry::kMinCols;
+    static const int kMinRows = Geometry::kMinRows;
 
     Layout();
     ~Layout();
 
     /** @brief Recreates every window for the current terminal size (LINES x COLS). */
     void rebuild();
-    /** @brief True if the terminal is below kMinCols x kMinRows (windows are then null). */
-    bool tooSmall() const { return tooSmall_; }
 
-    WINDOW* header() const { return header_; }
+    bool tooSmall() const { return geometry_.tooSmall; }
+    const Geometry& geometry() const { return geometry_; }
+
+    WINDOW* title() const { return title_; }
+    WINDOW* calendar() const { return calendar_; }
+    WINDOW* menu() const { return menu_; }
     WINDOW* list() const { return list_; }
     WINDOW* detail() const { return detail_; }
     WINDOW* body() const { return body_; }
+    WINDOW* ticker() const { return ticker_; }
     WINDOW* status() const { return status_; }
 
 private:
@@ -49,13 +47,17 @@ private:
     Layout& operator=(const Layout&) = delete;
 
     void destroy();
+    static WINDOW* open(const Rect& r);
 
-    WINDOW* header_;
+    Geometry geometry_;
+    WINDOW* title_;
+    WINDOW* calendar_;
+    WINDOW* menu_;
     WINDOW* list_;
     WINDOW* detail_;
     WINDOW* body_;
+    WINDOW* ticker_;
     WINDOW* status_;
-    bool tooSmall_;
 };
 
 } // namespace ui

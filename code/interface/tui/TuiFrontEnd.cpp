@@ -140,6 +140,18 @@ bool TuiFrontEnd::handleGlobal(int key) {
             return true;
         }
         return false;
+    case 'e':
+        if (screen_ == Screen::Dashboard) {
+            raiseEvent();
+            return true;
+        }
+        return false;
+    case 'u':
+        if (screen_ == Screen::Dashboard) {
+            undo();
+            return true;
+        }
+        return false;
     default:
         return false;
     }
@@ -478,7 +490,7 @@ void TuiFrontEnd::actionMenu() {
         }
     } else if (action == WorkAction::Cancel) {
         draw();
-        if (!Dialog::confirm("Cancel '" + item.name + "'? This cannot be undone.")) {
+        if (!Dialog::confirm("Cancel '" + item.name + "'? (u undoes it)")) {
             status_ = StatusMessage::info("Cancel not confirmed, nothing changed");
             return;
         }
@@ -577,6 +589,61 @@ void TuiFrontEnd::advanceClock() {
     }
 }
 
+void TuiFrontEnd::raiseEvent() {
+    const std::vector<std::string> types = controller_.eventTypes();
+    if (types.empty()) {
+        status_ = StatusMessage::info("This industry raises no events");
+        return;
+    }
+    std::vector<Line> entries;
+    for (std::size_t i = 0; i < types.size(); ++i) {
+        entries.push_back(Line(types[i], Tone::Red));
+    }
+    const int pick = Dialog::menu("RAISE AN EVENT", entries);
+    if (pick == Dialog::kCancelled) {
+        return;
+    }
+    draw();
+    std::string description;
+    if (!Dialog::prompt(types[pick], "What happened? (optional, shown in the history)", description)) {
+        status_ = StatusMessage::info("Event not raised, nothing changed");
+        return;
+    }
+    std::vector<std::string> changes;
+    status_ = controller_.raiseEvent(types[pick], description, changes);
+    if (status_.isError()) {
+        return;
+    }
+    std::vector<Line> lines;
+    for (std::size_t i = 0; i < changes.size(); ++i) {
+        const bool cancelled = changes[i].find("Cancelled") != std::string::npos;
+        lines.push_back(Line((cancelled ? "x  " : "+  ") + changes[i], cancelled ? Tone::Red : Tone::Gold));
+    }
+    if (lines.empty()) {
+        lines.push_back(Line("Nothing changed: no open work reacts to this event.", Tone::Muted));
+    }
+    lines.push_back(Line());
+    lines.push_back(Line("u undoes it", Tone::Muted));
+    Dialog::alert(types[pick], description.empty() ? controller_.view().instanceId : description, lines);
+    layout_.rebuild();   // the alert covered the whole screen: repaint every window from scratch
+}
+
+void TuiFrontEnd::undo() {
+    const std::string next = controller_.nextUndo();
+    if (next.empty()) {
+        status_ = StatusMessage::info("Nothing to undo in this instance");
+        return;
+    }
+    if (!Dialog::confirm("Undo '" + next + "'?")) {
+        status_ = StatusMessage::info("Undo not confirmed, nothing changed");
+        return;
+    }
+    const WorkItemView* item = selectedItem();
+    const std::string id = item != 0 ? item->id : "";
+    status_ = controller_.undo();
+    reselect(id);
+}
+
 void TuiFrontEnd::runCommand() {
     std::string line;
     if (!Dialog::prompt("COMMAND", "Type a command (help lists them; same commands as --plain):", line) ||
@@ -634,10 +701,12 @@ void TuiFrontEnd::showHelp() {
         lines.push_back(Line("  n                start another instance"));
         lines.push_back(Line("  p                choose who you are acting as"));
         lines.push_back(Line("  t                move the engine clock forward (deadlines, escalation)"));
+        lines.push_back(Line("  e                raise an event (e.g. WORM_SIGN); interrupt rules react"));
+        lines.push_back(Line("  u                undo the last action in this instance"));
         lines.push_back(Line("  Tab              switch between the list and the detail pane"));
         lines.push_back(Line());
-        lines.push_back(Line("Colours: gold = active work, muted = done or waiting, red = rejected,", Tone::Muted));
-        lines.push_back(Line("cancelled, escalated or an error.", Tone::Muted));
+        lines.push_back(Line("Colours: cyan = active work, steel = done or waiting, red = rejected,", Tone::Muted));
+        lines.push_back(Line("cancelled, escalated or an error. The cyan bar is the selection.", Tone::Muted));
         break;
     case Screen::History:
         lines.push_back(Line("History", Tone::Gold));
@@ -801,11 +870,11 @@ std::vector<Line> TuiFrontEnd::listRows(int width) const {
         }
     } else if (screen_ == Screen::Dashboard) {
         const std::vector<WorkItemView>& work = items();
-        const std::size_t nameWidth = static_cast<std::size_t>(std::max(8, width - 24));
+        const std::size_t nameWidth = static_cast<std::size_t>(std::max(8, width - 14));
         for (std::size_t i = 0; i < work.size(); ++i) {
             const WorkItemView& item = work[i];
             const bool waiting = item.trackerStatus == "waiting";
-            rows.push_back(Line(fit(item.name, nameWidth) + " " + fit(item.state, 10) + (waiting ? " waiting" : ""),
+            rows.push_back(Line(fit(item.name, nameWidth) + " " + (waiting ? std::string("Waiting") : item.state),
                                 Theme::forState(item.state, item.trackerStatus)));
         }
     }
@@ -962,7 +1031,10 @@ std::vector<Line> TuiFrontEnd::bodyLines() const {
                 }
             }
             const int filled = total == 0 ? 0 : count * barWidth / total;
-            const std::string bar = std::string(filled, '#') + std::string(barWidth - filled, '.');
+            std::string bar;
+            for (int b = 0; b < barWidth; ++b) {
+                bar += b < filled ? "\u2588" : "\u2591";   // full block / light shade
+            }
             lines.push_back(Line(fit(kStates[s], 12) + bar + "  " + number(count),
                                  count == 0 ? Tone::Muted : Theme::forState(kStates[s], "")));
         }
@@ -1051,7 +1123,8 @@ std::string TuiFrontEnd::hints() const {
         if (showPanel_) {
             return "Enter back to detail   (any other key also works)";
         }
-        return "Enter actions  v avail/all  a approvals  h history  r reports  p act as  t clock  b back  ? help";
+        return layout_.geometry().showMenu ? "Enter actions   v available/all   Tab detail   b back   ? help"
+                                           : "Enter act v avail a approve e event u undo h hist r rep p as t clock ? help";
     case Screen::History:
         return "Up/Down scroll   o oldest/newest first   / filter   Esc clear filter   b back   ? help";
     case Screen::Reports:
@@ -1067,17 +1140,21 @@ void TuiFrontEnd::draw() {
         drawTooSmall();
         return;
     }
-    drawHeader();
+    drawTitle();
+    drawCalendar();
+    drawMenu();
     if (screen_ == Screen::History || screen_ == Screen::Reports) {
         drawBody();
     } else {
         drawPanes();
     }
+    drawTicker();
     drawStatus();
     doupdate();
 }
 
 void TuiFrontEnd::drawTooSmall() {
+    Theme::paint(stdscr);
     erase();
     char size[96];
     std::snprintf(size, sizeof(size), "Terminal is %dx%d. TIVIDY needs at least %dx%d.", COLS, LINES,
@@ -1089,16 +1166,115 @@ void TuiFrontEnd::drawTooSmall() {
     doupdate();
 }
 
-void TuiFrontEnd::drawHeader() {
-    WINDOW* w = layout_.header();
+void TuiFrontEnd::drawTitle() {
+    WINDOW* w = layout_.title();
     werase(w);
-    putText(w, 0, 1, "TIVIDY", Tone::Gold, 0);
-    // The right side (engine label, clock, actor) is always shown whole; the path is cut instead.
-    const std::string right = headerRight();
-    const int rightWidth = static_cast<int>(right.size()) + 1;
-    const std::string path = screen_ == Screen::Industries ? "  Se7en workflow engine" : breadcrumb();
-    putText(w, 0, 7, path, Tone::Bone, rightWidth + 2);
-    putText(w, 0, std::max(7, COLS - rightWidth), right, Tone::Muted, 0);
+    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Title, 0);
+    putText(w, 0, 1, "TIVIDY", Tone::Title, 0);
+    putGlyphs(w, 0, 8, "\u25C6", Tone::Title);
+    const std::string label = "[" + engineLabel_ + "]";
+    const int labelWidth = static_cast<int>(label.size()) + 2;
+    const std::string path = screen_ == Screen::Industries ? " Se7en workflow engine" : breadcrumb();
+    putText(w, 0, 10, path, Tone::Title, labelWidth + 2);
+    putText(w, 0, std::max(10, COLS - labelWidth), label, Tone::Title, 0);
+    touchwin(w);
+    wnoutrefresh(w);
+}
+
+void TuiFrontEnd::drawCalendar() {
+    // The Persona calendar strip: the day (engine clock), where you are and who you are.
+    const SessionView& view = controller_.view();
+    WINDOW* w = layout_.calendar();
+    werase(w);
+    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Strip, 0);
+    putGlyphs(w, 0, 0, "\u25E4", Tone::Gold);
+    std::string strip = "  t=" + number(view.clock);
+    if (!view.industryId.empty()) {
+        strip += "   |   " + industryName();
+    }
+    if (!view.instanceId.empty()) {
+        strip += "   |   " + view.instanceId + "  " + instanceStatus(view.instance);
+    }
+    const std::string actor = controller_.participantName(view.actorId);
+    if (!actor.empty()) {
+        strip += "   |   acting as " + actor;
+    }
+    const std::string next = screen_ == Screen::Dashboard ? controller_.nextUndo() : "";
+    const std::string undoText = next.empty() ? "" : "u: undo " + next + " ";
+    // The undo hint keeps its place on the right; the strip is cut to fit beside it.
+    const int undoWidth = std::min(static_cast<int>(undoText.size()), COLS / 3);
+    putText(w, 0, 1, strip, Tone::Strip, undoWidth + 1);
+    if (!undoText.empty()) {
+        putText(w, 0, COLS - undoWidth, undoText, Tone::Strip, 0);
+    }
+    touchwin(w);
+    wnoutrefresh(w);
+}
+
+void TuiFrontEnd::drawMenu() {
+    WINDOW* w = layout_.menu();
+    if (w == 0) {
+        return;
+    }
+    werase(w);
+    const bool inInstance = !controller_.view().instanceId.empty();
+    const bool inIndustry = !controller_.view().industryId.empty();
+    struct Entry { const char* label; const char* key; bool screen; Screen target; bool enabled; };
+    const Entry entries[] = {
+        {"INDUSTRY",  "",  true,  Screen::Industries, true},
+        {"INSTANCES", "b", true,  Screen::Instances,  inIndustry},
+        {"DASHBOARD", "",  true,  Screen::Dashboard,  inInstance},
+        {"HISTORY",   "h", true,  Screen::History,    inInstance},
+        {"REPORTS",   "r", true,  Screen::Reports,    inInstance},
+        {"", "", false, Screen::Industries, false},
+        {"APPROVE",   "a", false, Screen::Dashboard,  inInstance},
+        {"EVENT",     "e", false, Screen::Dashboard,  inInstance},
+        {"UNDO",      "u", false, Screen::Dashboard,  inInstance},
+        {"CLOCK",     "t", false, Screen::Dashboard,  inIndustry},
+        {"ACT AS",    "p", false, Screen::Dashboard,  inIndustry},
+        {"COMMAND",   ":", false, Screen::Dashboard,  true},
+        {"HELP",      "?", false, Screen::Dashboard,  true},
+        {"QUIT",      "q", false, Screen::Dashboard,  true},
+    };
+    const int width = getmaxx(w);
+    int y = 1;
+    for (std::size_t i = 0; i < sizeof(entries) / sizeof(entries[0]) && y < getmaxy(w) - 1; ++i, ++y) {
+        const Entry& e = entries[i];
+        if (e.label[0] == '\0') {
+            putText(w, y, 2, std::string(static_cast<std::size_t>(width - 4), '-'), Tone::Muted, 0);
+            continue;
+        }
+        const bool current = e.screen && e.target == screen_;
+        // The current screen pops out as a cyan bar with a slanted end, like the P3R menu.
+        const std::string label = std::string(e.label);
+        if (current) {
+            putText(w, y, 1, fit(" " + label, static_cast<std::size_t>(width - 3)), Tone::Select, 0);
+            putGlyphs(w, y, width - 2, "\u25E4", Tone::Gold);
+        } else {
+            putText(w, y, 3, label, e.enabled ? Tone::Bone : Tone::Muted, 0);
+        }
+        if (e.key[0] != '\0') {
+            putText(w, y, width - 4, e.key, current ? Tone::Select : Tone::Muted, 0);
+        }
+    }
+    touchwin(w);
+    wnoutrefresh(w);
+}
+
+void TuiFrontEnd::drawTicker() {
+    // Live feed: the newest history entry of the open instance (Observer events land here).
+    WINDOW* w = layout_.ticker();
+    werase(w);
+    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Strip, 0);
+    putText(w, 0, 1, " LIVE ", Tone::Banner, 0);
+    std::string latest = "Choose an industry and an instance to see its events here.";
+    if (!controller_.view().instanceId.empty()) {
+        std::vector<std::string> lines;
+        controller_.history(lines, true, "");
+        latest = lines.empty() ? "No events yet." : lines.front();
+    }
+    putGlyphs(w, 0, 8, "\u25B6", Tone::Strip);
+    putText(w, 0, 10, latest, Tone::Strip, 1);
     touchwin(w);
     wnoutrefresh(w);
 }
@@ -1126,13 +1302,11 @@ void TuiFrontEnd::drawPanes() {
     for (int row = 0; row < visible && listTop_ + row < count; ++row) {
         const int index = listTop_ + row;
         const bool chosen = index == selected_;
-        const std::string text = fit((chosen ? "> " : "  ") + rows[index].text, static_cast<std::size_t>(width));
-        if (chosen && focus_ == Pane::List) {
-            wattron(list, A_REVERSE);
-        }
-        putText(list, 1 + row, 2, text, chosen ? Tone::Gold : rows[index].tone, 2);
-        if (chosen && focus_ == Pane::List) {
-            wattroff(list, A_REVERSE);
+        if (chosen && focus_ != Pane::List) {
+            putRow(list, 1 + row, 2, width, rows[index].text, Tone::Gold, false);
+            putGlyphs(list, 1 + row, 2, "\u25B7", Tone::Gold);
+        } else {
+            putRow(list, 1 + row, 2, width, rows[index].text, rows[index].tone, chosen);
         }
     }
     if (listTop_ > 0) {

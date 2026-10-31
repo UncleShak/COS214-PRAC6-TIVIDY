@@ -75,6 +75,9 @@ private:
     Reply listApprovals() const;
     Reply decideApproval(bool approve, const std::vector<std::string>& args);
     Reply advance(const std::vector<std::string>& args);
+    Reply listEvents();
+    Reply raiseEvent(const std::vector<std::string>& args);
+    Reply undo();
     Reply history(const std::vector<std::string>& args);
     Reply report();
 

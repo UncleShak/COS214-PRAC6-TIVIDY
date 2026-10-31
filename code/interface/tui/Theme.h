@@ -1,10 +1,11 @@
 /**
  * @file Theme.h
- * @brief The Se7en colour palette for the ncurses front end.
+ * @brief The Persona-style palette for the ncurses front end.
  *
- * 256-colour terminals (Windows Terminal) get the team palette: bone 230, gold 179,
- * muted 101, red 160. Terminals with fewer colours fall back to the 8 basic colours,
- * and terminals without colour use bold and dim only.
+ * 256-colour terminals (xterm-256color, Windows Terminal) get deep navy (17) as the
+ * background, white (255) text, cyan (45) accents, steel blue (67) for secondary text and
+ * crimson (197) for alerts. Terminals with 8 colours use blue/cyan/white/red, and terminals
+ * without colour use bold, dim and reverse only.
  *
  * @author Shakir Alexander (Lust)
  */
@@ -21,7 +22,11 @@ enum class Tone {
     Bone,  ///< normal text
     Gold,  ///< active work, selection, focus
     Muted, ///< done, waiting or secondary
-    Red    ///< rejected, cancelled, escalated, errors
+    Red,   ///< rejected, cancelled, escalated, errors
+    Select, ///< the selection bar: navy on cyan
+    Title,  ///< title band and panel tabs: white on blue
+    Strip,  ///< calendar strip and ticker: pale text on dark blue
+    Banner  ///< full-screen alert: white on red
 };
 
 /** @brief Colour pairs and the state-to-colour mapping. */
@@ -29,6 +34,8 @@ class Theme {
 public:
     /** @brief Creates the colour pairs. Called once by CursesSession. */
     static void init(bool colour);
+    /** @brief Fills @p window with the navy background (call after creating it). */
+    static void paint(void* window);
     /** @brief Attribute to pass to wattron/wattroff for @p tone. */
     static int attr(Tone tone);
     /**

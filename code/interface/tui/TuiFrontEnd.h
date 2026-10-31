@@ -12,8 +12,12 @@
  *   panel showing each state change and routing decision (or the engine's refusal).
  * - History: the instance's history through Envy's HistoryIterator (order, filter).
  * - Reports: the Progress, Audit and Overdue visitor reports.
- * Plus help (?), a command bar (:) that accepts the same commands as --plain, and the
- * "terminal too small" screen.
+ * Plus help (?), a command bar (:) that accepts the same commands as --plain, events (e)
+ * with a full-screen alert, undo (u), and the "terminal too small" screen.
+ *
+ * Look (Persona 3 Reload style, kept simple): navy background, a title band and a calendar
+ * strip at the top, a slanted command menu on the left (wide terminals), cyan selection bars,
+ * slanted panel tabs, and a live event ticker above the key hints.
  *
  * @author Shakir Alexander (Lust)
  */
@@ -71,6 +75,8 @@ private:
     void actionMenu();
     void approvalsMenu();
     void advanceClock();
+    void raiseEvent();
+    void undo();
     void runCommand();
     void showHelp();
     void quit();
@@ -101,7 +107,10 @@ private:
     // ---- drawing
     void draw();
     void drawTooSmall();
-    void drawHeader();
+    void drawTitle();
+    void drawCalendar();
+    void drawMenu();
+    void drawTicker();
     void drawPanes();
     void drawBody();
     void drawStatus();

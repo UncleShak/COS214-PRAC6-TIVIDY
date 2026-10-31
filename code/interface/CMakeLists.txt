@@ -19,20 +19,28 @@ option(TIVIDY_WITH_CURSES "Build the ncurses front end (off: --plain only)" ON)
 
 get_filename_component(TIVIDY_CODE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 
-add_library(tividy_ui_core STATIC
+set(TIVIDY_UI_CORE_SOURCES
     InterfaceController.cpp
     InputValidation.cpp
     LineInterpreter.cpp
     Log.cpp
     plain/PlainFrontEnd.cpp
-    ${TIVIDY_CODE_DIR}/iterator/HistoryIterator.cpp   # Envy's Iterator, used for history
 )
+# Envy's Iterator is used for history. Inside the full build it comes from the engine library;
+# built alone (tests/lust), the interface compiles that one file itself.
+if(NOT TARGET tividy_engine)
+    list(APPEND TIVIDY_UI_CORE_SOURCES ${TIVIDY_CODE_DIR}/iterator/HistoryIterator.cpp)
+endif()
+add_library(tividy_ui_core STATIC ${TIVIDY_UI_CORE_SOURCES})
 target_include_directories(tividy_ui_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/plain
     ${TIVIDY_CODE_DIR}/iterator
 )
 target_compile_options(tividy_ui_core PRIVATE -Wall -Wextra)
+if(TARGET tividy_engine)
+    target_link_libraries(tividy_ui_core PUBLIC tividy_engine)
+endif()
 
 if(TIVIDY_WITH_CURSES)
     set(CURSES_NEED_WIDE TRUE)
@@ -60,9 +68,17 @@ if(NOT CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     set(TIVIDY_FRONT_ENDS ${TIVIDY_FRONT_ENDS} PARENT_SCOPE)
 endif()
 
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/RealEngineFactory.cpp)
+# The shipped program: the real engine gateway, only inside the full build (root CMakeLists.txt).
+if(TARGET tividy_engine)
+    add_library(tividy_real_engine STATIC real/RealEngine.cpp)
+    target_include_directories(tividy_real_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/real)
+    target_link_libraries(tividy_real_engine PUBLIC tividy_engine)
+    tividy_configure(tividy_real_engine)
+
     add_executable(tividy ${TIVIDY_MAIN_SOURCE} RealEngineFactory.cpp)
-    target_link_libraries(tividy ${TIVIDY_FRONT_ENDS})
+    target_link_libraries(tividy PRIVATE tividy_real_engine ${TIVIDY_FRONT_ENDS})
+    tividy_configure(tividy)
+    set_target_properties(tividy PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 else()
-    message(STATUS "tividy: not built yet, RealEngineFactory.cpp (real engine) does not exist")
+    message(STATUS "tividy: built only from the root CMakeLists.txt (it needs the engine)")
 endif()

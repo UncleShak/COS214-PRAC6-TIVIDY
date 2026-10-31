@@ -84,6 +84,18 @@ public:
      */
     StatusMessage advance(const std::string& unitsText, std::vector<std::string>& changes);
 
+    /** @brief Domain events the current industry reacts to (e.g. WORM_SIGN). */
+    std::vector<std::string> eventTypes() const;
+    /**
+     * @brief Raises a domain event on the selected instance (Observer); interrupt rules react.
+     * @param changes set to the work items whose state changed
+     */
+    StatusMessage raiseEvent(const std::string& type, const std::string& description,
+                             std::vector<std::string>& changes);
+    /** @brief What undo() would reverse in the selected instance, or "" if nothing. */
+    std::string nextUndo() const;
+    /** @brief Reverses the selected instance's most recent action (Memento). */
+    StatusMessage undo();
     bool hasOutcome() const { return hasOutcome_; }
     /** @brief What the last successful perform() changed (state and routing). */
     const ActionOutcome& lastOutcome() const { return outcome_; }

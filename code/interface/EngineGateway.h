@@ -22,6 +22,7 @@
 #define TIVIDY_ENGINE_GATEWAY_H
 
 #include <map>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -196,6 +197,34 @@ public:
 
     /** @brief The engine clock's current time, in the same units. */
     virtual int currentTime() const = 0;
+
+    // ---- added for the real engine (Observer events and Memento undo) ----
+    // Defaults refuse, so an engine without these (FakeEngine) still builds.
+
+    /** @brief Domain events the industry reacts to, e.g. "WORM_SIGN". */
+    virtual std::vector<std::string> eventTypes(const std::string& industryId) const {
+        (void)industryId;
+        return std::vector<std::string>();
+    }
+    /**
+     * @brief Raises a domain event on an instance; the industry's interrupt rules react.
+     * @return one line per thing that changed
+     */
+    virtual std::vector<std::string> raiseEvent(const std::string& instanceId, const std::string& type,
+                                                const std::string& description) {
+        (void)instanceId; (void)type; (void)description;
+        throw std::logic_error("This engine does not support events");
+    }
+    /** @brief Label of the action undo() would reverse, or "" if there is none. */
+    virtual std::string nextUndo(const std::string& instanceId) const {
+        (void)instanceId;
+        return "";
+    }
+    /** @brief Reverses the instance's most recent action. @return what was undone. */
+    virtual std::string undo(const std::string& instanceId) {
+        (void)instanceId;
+        throw std::logic_error("This engine does not support undo");
+    }
 };
 
 /** @brief Display name of an action ("Assign", "Start", ...). */

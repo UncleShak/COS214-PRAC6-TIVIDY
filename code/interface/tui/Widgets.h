@@ -37,8 +37,14 @@ struct Line {
 /** @brief Writes @p text at (y, x), cut to fit the window width minus @p margin. */
 void putText(WINDOW* window, int y, int x, const std::string& text, Tone tone, int margin = 1);
 
-/** @brief Box with a title; gold border when the window has focus. */
+/** @brief Box with a slanted title tab; cyan border when the window has focus. */
 void drawFrame(WINDOW* window, const std::string& title, bool focused);
+
+/** @brief Writes UTF-8 decoration (block and box characters) at (y, x) without cutting it. */
+void putGlyphs(WINDOW* window, int y, int x, const char* glyphs, Tone tone);
+
+/** @brief One list row: a cyan selection bar with a pointer when @p chosen. */
+void putRow(WINDOW* window, int y, int x, int width, const std::string& text, Tone tone, bool chosen);
 
 /** @brief @p text cut or padded with spaces to exactly @p width characters. */
 std::string fit(const std::string& text, std::size_t width);
@@ -76,6 +82,12 @@ public:
 
     /** @brief Scrollable read-only text. Esc, Enter, q or b closes it. */
     static void text(const std::string& title, const std::vector<Line>& lines);
+
+    /**
+     * @brief Full-screen alert (the Persona "all-out" moment): a red band with @p title in
+     *        large spaced letters, @p subtitle under it, then @p lines. Any key closes it.
+     */
+    static void alert(const std::string& title, const std::string& subtitle, const std::vector<Line>& lines);
 
     /**
      * @brief The start-instance form: one input per field, validated with validateField()
