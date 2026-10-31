@@ -271,9 +271,10 @@ TEST_CASE("unauthorised participant gets AccessDenied and the request stays PEND
     RecordingHistory history;
     ApprovalDesk desk(chain.get(), &clock, &history);
     Participant sam = person("Sam", "supervisor");
+    Participant bob = person("Bob", "manager"); // Bob does not have the supervisor role
 
-    const ApprovalRequest* r = desk.submit("X", &sam, 5000.0, "mid");
-    CHECK_THROWS_AS(desk.decide(r->getId(), sam, true, ""), AccessDenied);
+    const ApprovalRequest* r = desk.submit("X", &sam, 5000.0, "mid"); // Request goes to Supervisor
+    CHECK_THROWS_AS(desk.decide(r->getId(), bob, true, ""), AccessDenied); // Bob tries to decide it
     CHECK(desk.get(r->getId())->getStatus() == PENDING);
 }
 
@@ -395,8 +396,9 @@ TEST_CASE("every engine refusal can be caught as WorkflowException") {
         RecordingHistory history;
         ApprovalDesk desk(chain.get(), &clock, &history);
         Participant sam = person("Sam", "supervisor");
+        Participant bob = person("Bob", "manager"); // Add Bob
         const ApprovalRequest* r = desk.submit("X", &sam, 5000.0, "mid");
-        CHECK_THROWS_AS(desk.decide(r->getId(), sam, true, ""), WorkflowException);
+        CHECK_THROWS_AS(desk.decide(r->getId(), bob, true, ""), WorkflowException);
     }
 }
 
