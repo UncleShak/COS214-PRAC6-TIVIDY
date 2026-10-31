@@ -34,6 +34,7 @@ public:
 
     int getDuration() const { return duration; }
     int getDueTime() const { return dueTime; }
+    void restoreDueTime(int savedDueTime) { dueTime = savedDueTime; }
     void add(WorkflowComponent* c) override;
     void remove(WorkflowComponent* c) override;
 

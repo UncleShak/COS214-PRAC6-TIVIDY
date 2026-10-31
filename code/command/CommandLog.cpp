@@ -20,3 +20,8 @@ std::vector<std::string> CommandLog::describeAll() const {
     }
     return out;
 }
+
+void CommandLog::truncate(std::size_t count) {
+    if (count > done.size()) throw std::invalid_argument("Invalid saved command count");
+    while (done.size() > count) done.pop_back();
+}

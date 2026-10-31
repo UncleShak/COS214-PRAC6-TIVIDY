@@ -146,3 +146,42 @@ bool ApprovalDesk::hasPending(const std::string& itemName) const {
     }
     return false;
 }
+
+ApprovalDesk::Snapshot ApprovalDesk::save() const {
+    Snapshot snapshot;
+    snapshot.nextId = nextId;
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        const ApprovalRequest& request = *requests[i];
+        RequestState saved;
+        saved.id = request.getId();
+        saved.itemName = request.getItemName();
+        saved.requesterName = request.getRequesterName();
+        saved.value = request.getValue();
+        saved.reason = request.getReason();
+        saved.raisedAt = request.getRaisedAt();
+        saved.status = request.getStatus();
+        saved.handler = request.getHandler();
+        saved.deadline = request.getDeadline();
+        saved.decidedBy = request.getDecidedBy();
+        saved.decisionNote = request.getDecisionNote();
+        snapshot.requests.push_back(saved);
+    }
+    return snapshot;
+}
+
+void ApprovalDesk::restore(const Snapshot& snapshot) {
+    // Build the replacement first so an allocation failure leaves this desk intact.
+    std::vector<std::unique_ptr<ApprovalRequest> > restored;
+    for (std::size_t i = 0; i < snapshot.requests.size(); ++i) {
+        const RequestState& saved = snapshot.requests[i];
+        std::unique_ptr<ApprovalRequest> request(new ApprovalRequest(
+            saved.id, saved.itemName, saved.requesterName, saved.value,
+            saved.reason, saved.raisedAt));
+        request->assignTo(saved.handler, saved.deadline);
+        if (saved.status != PENDING)
+            request->resolve(saved.status, saved.decidedBy, saved.decisionNote);
+        restored.push_back(std::move(request));
+    }
+    requests.swap(restored);
+    nextId = snapshot.nextId;
+}

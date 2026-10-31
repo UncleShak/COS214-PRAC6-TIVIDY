@@ -97,6 +97,27 @@ public:
 
     /** @brief True if itemName has a PENDING request. */
     bool hasPending(const std::string& itemName) const;
+    
+// Plain values saved by an instance snapshot. Handler pointers are borrowed
+    // from the definition, which must outlive its instances and snapshots.
+    struct RequestState {
+        int id;
+        std::string itemName, requesterName;
+        double value;
+        std::string reason;
+        int raisedAt;
+        ApprovalStatus status;
+        ApprovalHandler* handler;
+        int deadline;
+        std::string decidedBy, decisionNote;
+    };
+    struct Snapshot {
+        std::vector<RequestState> requests;
+        int nextId;
+        Snapshot() : nextId(1) {}
+    };
+    Snapshot save() const;
+    void restore(const Snapshot& snapshot);
 
     ApprovalDesk(const ApprovalDesk&) = delete;
     ApprovalDesk& operator=(const ApprovalDesk&) = delete;

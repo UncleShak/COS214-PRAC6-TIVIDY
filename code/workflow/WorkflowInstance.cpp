@@ -415,7 +415,14 @@ InstanceSnapshot* WorkflowInstance::createSnapshot() const {
         record.assignee = it->second->getAssignedParticipant();
         saved[it->first] = record;
     }
-    return new InstanceSnapshot(saved, payload->clone(), tracker->saveProgress());
+    std::map<std::string, int> deadlines;
+    for (const auto& entry : decorated)
+        deadlines[entry.first] = entry.second->deadline == nullptr
+            ? -1 : entry.second->deadline->getDueTime();
+    ApprovalDesk::Snapshot approvals;
+    if (approvalDesk) approvals = approvalDesk->save();
+    return new InstanceSnapshot(saved, payload->clone(), tracker->saveProgress(),
+                                approvals, deadlines, commandLog.size(), this);
 }
 
 void WorkflowInstance::restore(const InstanceSnapshot* snapshot) {
@@ -427,4 +434,18 @@ void WorkflowInstance::restore(const InstanceSnapshot* snapshot) {
     payload.reset(snapshot->getSavedPayload() != nullptr ? snapshot->getSavedPayload()->clone() : new KeyValuePayload());
     tracker->restoreProgress(snapshot->getSavedProgress());
     started = snapshot->getSavedProgress().started;
+
+    if (approvalDesk) approvalDesk->restore(snapshot->getSavedApprovals());
+
+    // Logged guards can still point to old layers, so retire rather than delete them.
+    for (auto& entry : decorated) retired.push_back(std::move(entry.second));
+    decorated.clear();
+    for (const auto& entry : snapshot->getSavedDeadlines()) {
+        decorate(entry.first);
+        Decorated* layers = decorated.at(entry.first).get();
+        if (layers->deadline != nullptr) layers->deadline->restoreDueTime(entry.second);
+    }
+    commandLog.truncate(snapshot->getSavedCommandCount());
+    beginAction();
+    history.record("Snapshot restored; audit history retained");
 }

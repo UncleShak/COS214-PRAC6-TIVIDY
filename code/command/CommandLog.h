@@ -35,6 +35,10 @@ public:
     /** @brief Descriptions of every successful command, oldest first. */
     std::vector<std::string> describeAll() const;
 
+        // Drop commands whose state changes have been undone; audit history is separate.
+    void truncate(std::size_t count);
+
+
 private:
     std::vector<std::unique_ptr<Command>> done;
 };
