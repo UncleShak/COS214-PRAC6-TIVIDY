@@ -15,6 +15,7 @@ public:
     Participant(const std::string& name, const std::string& id);
     void addRole(const Role& role);
     bool hasRole(const std::string& roleName) const;
+    std::vector<std::string> getRoleNames() const;
     std::string getName() const;
     std::string getID() const;
     int getWorkload() const;

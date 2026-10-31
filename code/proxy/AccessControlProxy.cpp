@@ -6,9 +6,20 @@
  */
 #include "AccessControlProxy.h"
 #include <stdexcept>
+#include "Participant.h"
+#include "WorkflowException.h"
 
-AccessControlProxy::AccessControlProxy(WorkflowComponent* realSubject, AccessPolicy* policy, const std::string& actorRole, const std::string& requiredRole, bool ownsSubject)
+AccessControlProxy::AccessControlProxy(WorkflowComponent* realSubject, const AccessPolicy* policy, const std::string& actorRole, const std::string& requiredRole, bool ownsSubject)
                                       : realSubject(realSubject), policy(policy), actorRole(actorRole), requiredRole(requiredRole), ownsSubject(ownsSubject) {
+    if (realSubject == nullptr) {
+        throw std::invalid_argument("AccessControlProxy requires a non-null realSubject");
+    }
+}
+
+AccessControlProxy::AccessControlProxy(WorkflowComponent* subject, const AccessPolicy* accessPolicy,
+                                       const Participant& actor, const std::string& required)
+    : realSubject(subject), policy(accessPolicy), actorRoles(actor.getRoleNames()), actorName(actor.getName()),
+      requiredRole(required), ownsSubject(false) {
     if (realSubject == nullptr) {
         throw std::invalid_argument("AccessControlProxy requires a non-null realSubject");
     }
@@ -25,18 +36,34 @@ std::string AccessControlProxy::getName() const {
 }
 
 void AccessControlProxy::checkAccess(const std::string& action) const {
-    if (policy != nullptr) {
+    if (policy == nullptr) {
+        return;
+    }
+    if (actorRoles.empty()) {
         if (!policy->isAllowed(actorRole, requiredRole, action)) {
-            throw std::logic_error("Access denied: role '" + actorRole +
-                                   "' is not permitted to perform '" + action +
-                                   "' on work item '" + getName() +
-                                   "' (requires role '" + requiredRole + "')");
+            throw AccessDenied("Access denied: role '" + actorRole +
+                               "' is not permitted to perform '" + action +
+                               "' on work item '" + getName() +
+                               "' (requires role '" + requiredRole + "')");
+        }
+        return;
+    }
+    for (std::size_t i = 0; i < actorRoles.size(); ++i) {
+        if (policy->isAllowed(actorRoles[i], requiredRole, action)) {
+            return;
         }
     }
+    throw AccessDenied("Access denied: " + actorName + " may not " + action + " '" + getName() + "'");
+}
+
+void AccessControlProxy::authorize(const std::string& action) const {
+    checkAccess(action);
+    realSubject->authorize(action);   // a guarded component may itself be guarded
 }
 
 void AccessControlProxy::request() {
-    checkAccess("request");
+    // request() performs the work, which for a work item means completing it.
+    checkAccess("complete");
     realSubject->request();
 }
 
@@ -71,11 +98,11 @@ std::string AccessControlProxy::getRequiredRole() const {
     return requiredRole;
 }
 
-void AccessControlProxy::setPolicy(AccessPolicy* newPolicy) {
+void AccessControlProxy::setPolicy(const AccessPolicy* newPolicy) {
     policy = newPolicy;
 }
 
-AccessPolicy* AccessControlProxy::getPolicy() const {
+const AccessPolicy* AccessControlProxy::getPolicy() const {
     return policy;
 }
 

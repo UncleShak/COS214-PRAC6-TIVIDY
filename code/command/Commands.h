@@ -11,6 +11,10 @@
  * | CancelCommand   | cancel()                                   | Available, Assigned, Started, Escalated -> Cancelled |
  * | EscalateCommand | escalate()                                 | Available -> Escalated               |
  *
+ * Proxy: every command first calls target->authorize("<action>"). When the target is an
+ * AccessControlProxy around the item, the AccessPolicy can refuse (AccessDenied) before the
+ * item is touched; with no proxy the item itself allows everything.
+ *
  * The WorkItemState classes decide whether each move is legal and throw std::logic_error
  * if it is not. The commands add two rules of their own: only the assignee may start or
  * complete the work, and the assignee's workload is kept up to date for
@@ -34,7 +38,7 @@ public:
      * @param assignee Who receives the work.
      * @throws std::invalid_argument if assignee is null.
      */
-    AssignCommand(WorkItem* i, Participant* a, Participant* assignee);
+    AssignCommand(WorkItem* i, Participant* a, Participant* assignee, WorkflowComponent* target = nullptr);
     void execute() override;
     std::string describe() const override;
     Participant* getAssignee() const { return assignee; }
@@ -46,7 +50,7 @@ private:
 /** @brief The assignee starts the work. */
 class StartCommand : public Command {
 public:
-    StartCommand(WorkItem* i, Participant* a);
+    StartCommand(WorkItem* i, Participant* a, WorkflowComponent* target = nullptr);
     void execute() override;
     std::string describe() const override;
 };
@@ -69,7 +73,7 @@ public:
 class RejectCommand : public Command {
 public:
     /** @param reason Why the work was rejected; shown in history and the interface. */
-    RejectCommand(WorkItem* i, Participant* a, const std::string& reason);
+    RejectCommand(WorkItem* i, Participant* a, const std::string& reason, WorkflowComponent* target = nullptr);
     void execute() override;
     std::string describe() const override;
     const std::string& getReason() const { return reason; }
@@ -81,7 +85,7 @@ private:
 /** @brief Cancels work that has not finished and frees the assignee, if there is one. */
 class CancelCommand : public Command {
 public:
-    CancelCommand(WorkItem* i, Participant* a);
+    CancelCommand(WorkItem* i, Participant* a, WorkflowComponent* target = nullptr);
     void execute() override;
     std::string describe() const override;
 };
@@ -94,7 +98,7 @@ public:
  */
 class EscalateCommand : public Command {
 public:
-    EscalateCommand(WorkItem* i, Participant* a);
+    EscalateCommand(WorkItem* i, Participant* a, WorkflowComponent* target = nullptr);
     void execute() override;
     std::string describe() const override;
 };

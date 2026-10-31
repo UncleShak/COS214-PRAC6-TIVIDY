@@ -2,6 +2,7 @@
 #include "../workflow/Stage.h"
 #include "../workflow/WorkItem.h"
 #include <algorithm>
+#include <iterator>
 #include <stdexcept>
 ScenarioBuilder::ScenarioBuilder(const std::string& n, const std::string& v)
     : name(n), version(v), routing(nullptr) {
@@ -90,16 +91,58 @@ void ScenarioBuilder::buildConnector(const std::string& item, std::shared_ptr<Co
     if (product->connectors.count(item)) throw std::invalid_argument("Item already has a connector");
     product->connectors[item] = WorkflowDefinition::ConnectorBinding{connector, operation};
 }
+void ScenarioBuilder::buildAccessRule(const std::string& action, const std::vector<std::string>& roles) {
+    requireProduct();
+    static const char* const known[] = {"assign", "start", "complete", "reject", "cancel", "escalate"};
+    if (std::find(std::begin(known), std::end(known), action) == std::end(known))
+        throw std::invalid_argument("Unknown action for an access rule: " + action);
+    product->accessPolicy.restrict(action, roles);
+}
+void ScenarioBuilder::buildDeadline(const std::string& item, int duration) {
+    requireItem(item);
+    if (duration <= 0) throw std::invalid_argument("A deadline must be at least one clock unit");
+    product->decorations[item].deadline = duration;
+}
+void ScenarioBuilder::buildAudit(const std::string& item) {
+    requireItem(item);
+    product->decorations[item].audit = true;
+}
+void ScenarioBuilder::buildApprovalChain(std::unique_ptr<ApprovalHandler> chain) {
+    requireProduct();
+    if (!chain) throw std::invalid_argument("Approval chain cannot be null");
+    product->approvalChain = std::move(chain);
+}
+void ScenarioBuilder::buildApproval(const std::string& item, const std::string& valueField,
+                                    const std::string& resultField) {
+    requireItem(item);
+    if (valueField.empty() || resultField.empty())
+        throw std::invalid_argument("An approval needs a value field and a result field");
+    product->approvals[item] = WorkflowDefinition::ApprovalRule{valueField, resultField};
+}
+void ScenarioBuilder::buildInterrupt(const std::string& eventType, const std::vector<std::string>& cancel,
+                                     const std::vector<std::string>& open) {
+    requireProduct();
+    if (eventType.empty() || (cancel.empty() && open.empty()))
+        throw std::invalid_argument("Interrupt needs an event type and something to cancel or open");
+    for (const auto& item : cancel) requireItem(item);
+    for (const auto& item : open) requireItem(item);
+    for (const auto& rule : product->interrupts)
+        if (rule.eventType == eventType) throw std::invalid_argument("Interrupt already defined: " + eventType);
+    product->interrupts.push_back(WorkflowDefinition::InterruptRule{eventType, cancel, open});
+}
 std::unique_ptr<WorkflowDefinition> ScenarioBuilder::getResult() {
     requireProduct();
     if (items.empty() || product->entryItems.empty() || !product->assignmentRule)
         throw std::logic_error("Definition needs work, entry items and an assignment rule");
+    if (!product->approvals.empty() && !product->approvalChain)
+        throw std::logic_error("Definition has approval items but no approval chain");
     std::set<std::string> visited;
     std::vector<std::string> pending = product->entryItems;
     bool runnableEntry = false;
     for (const auto& item : pending)
         if (product->dependencies.prerequisitesOf(item).empty()) runnableEntry = true;
     if (!runnableEntry) throw std::logic_error("No entry item can start");
+    for (const auto& rule : product->interrupts) pending.insert(pending.end(), rule.open.begin(), rule.open.end());
     while (!pending.empty()) {
         const auto item = pending.back(); pending.pop_back();
         if (!visited.insert(item).second) continue;

@@ -23,6 +23,9 @@
 #include "WorkflowComponent.h"
 #include "AccessPolicy.h"
 #include <string>
+#include <vector>
+
+class Participant;
 
 class AccessControlProxy : public WorkflowComponent {
 public:
@@ -35,10 +38,19 @@ public:
      * @param ownsSubject If true, destructing the proxy will delete realSubject.
      */
     AccessControlProxy(WorkflowComponent* realSubject,
-                       AccessPolicy* policy,
+                       const AccessPolicy* policy,
                        const std::string& actorRole = "",
                        const std::string& requiredRole = "",
                        bool ownsSubject = false);
+
+    /**
+     * @brief Guards work for one participant: access is allowed if any of the participant's
+     *        roles is allowed. This is how the engine uses the proxy (Commands are the clients).
+     */
+    AccessControlProxy(WorkflowComponent* realSubject,
+                       const AccessPolicy* policy,
+                       const Participant& actor,
+                       const std::string& requiredRole);
 
     ~AccessControlProxy() override;
 
@@ -67,14 +79,17 @@ public:
      */
     void accept(WorkflowVisitor* visitor) override;
 
+    /** @brief Protection check for any operation; throws AccessDenied if refused. */
+    void authorize(const std::string& action) const override;
+
     void setActorRole(const std::string& role);
     std::string getActorRole() const;
 
     void setRequiredRole(const std::string& role);
     std::string getRequiredRole() const;
 
-    void setPolicy(AccessPolicy* newPolicy);
-    AccessPolicy* getPolicy() const;
+    void setPolicy(const AccessPolicy* newPolicy);
+    const AccessPolicy* getPolicy() const;
 
     WorkflowComponent* getRealSubject() const;
 
@@ -82,8 +97,10 @@ private:
     void checkAccess(const std::string& action) const;
 
     WorkflowComponent* realSubject;
-    AccessPolicy* policy;
+    const AccessPolicy* policy;
     std::string actorRole;
+    std::vector<std::string> actorRoles;   ///< all of the actor's roles (participant constructor)
+    std::string actorName;
     std::string requiredRole;
     bool ownsSubject;
 };

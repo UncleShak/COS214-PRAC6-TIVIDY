@@ -39,6 +39,7 @@ public:
     void add(WorkflowComponent* c) override;
     /** @brief Forwards unchanged. */
     void remove(WorkflowComponent* c) override;
+    void authorize(const std::string& action) const override;
 
     /** @brief The component this decorator wraps. */
     WorkflowComponent* getComponent() const { return component; }

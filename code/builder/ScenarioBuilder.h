@@ -4,6 +4,8 @@
 #include "../workflow/WorkflowDefinition.h"
 #include "../routing/DataBasedRouting.h"
 #include "../assignment/AssignmentRule.h"
+#include "../integration/Connector.h"
+#include <memory>
 #include <set>
 class Stage;
 /** @brief Shared assembly mechanics for concrete industry Builders.
@@ -26,6 +28,20 @@ protected:
     void buildDefaultBranch(const std::string& from, const std::vector<std::string>& targets);
     void buildAssignmentRule(std::unique_ptr<AssignmentRule> rule);
     void buildConnector(const std::string& item, std::shared_ptr<Connector>, const std::string& operation);
+    // An event type that cancels `cancel` and opens `open` (items reachable only this way count as reachable).
+    // Proxy policy: only these roles may perform action ("assign", "start", "complete", "reject",
+    // "cancel", "escalate") on any item of this workflow.
+    void buildAccessRule(const std::string& action, const std::vector<std::string>& roles);
+    // Decorator: the item must be completed within `duration` clock units of becoming available.
+    void buildDeadline(const std::string& item, int duration);
+    // Decorator: every completion attempt of the item is written to the instance history.
+    void buildAudit(const std::string& item);
+    // Chain of Responsibility: the first handler of this workflow's approval chain (owns the rest).
+    void buildApprovalChain(std::unique_ptr<ApprovalHandler> chain);
+    // The item is decided by the approval chain (see WorkflowDefinition::ApprovalRule).
+    void buildApproval(const std::string& item, const std::string& valueField, const std::string& resultField);
+    void buildInterrupt(const std::string& eventType, const std::vector<std::string>& cancel,
+                        const std::vector<std::string>& open);
 private:
     void requireProduct() const;
     void requireItem(const std::string&) const;

@@ -17,3 +17,5 @@ std::string TaskDecorator::getName() const { return component->getName(); }
 void TaskDecorator::add(WorkflowComponent* c) { component->add(c); }
 
 void TaskDecorator::remove(WorkflowComponent* c) { component->remove(c); }
+
+void TaskDecorator::authorize(const std::string& action) const { component->authorize(action); }
