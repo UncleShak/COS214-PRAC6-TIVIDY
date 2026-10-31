@@ -1,12 +1,14 @@
 #ifndef PROGRESSION_TRACKER_H
 #define PROGRESSION_TRACKER_H
 
+#include <memory>
 #include <set>
 #include <string>
 #include <vector>
 
 #include "DataPayload.h"
 #include "DependencyGraph.h"
+#include "WorkflowIterator.h"
 #include "RoutingRule.h"
 #include "WorkflowComponent.h"
 
@@ -64,6 +66,11 @@ public:
     bool isRejected(const std::string& item) const;
     bool isCancelled(const std::string& item) const;
     const std::vector<std::string>& availableItems() const;
+    /**
+     * Iterator pattern (Aggregate): a new AvailableWorkIterator over the work available now.
+     * The iterator keeps its own copy, so completing work while looping is safe.
+     */
+    std::unique_ptr<WorkflowIterator<std::string> > createIterator() const;
     const std::vector<std::string>& waitingItems() const;
     const std::set<std::string>& completedItems() const;
     const std::set<std::string>& rejectedItems() const;

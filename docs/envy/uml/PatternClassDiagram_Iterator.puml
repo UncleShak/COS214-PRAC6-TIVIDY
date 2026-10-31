@@ -1,0 +1,81 @@
+@startuml PatternClassDiagram_Iterator
+' Pattern class diagram: Iterator (available work and history).
+' Owner: Envy. Green = Envy's classes in code/iterator and code/progression. Yellow = teammates' classes.
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #33CC33
+  BorderColor #1E7A1E
+}
+hide empty members
+title Iterator: available work and history (actual C++ classes)
+
+abstract class "WorkflowIterator<T>" as WorkflowIterator <<Iterator>> {
+  +{abstract} first() : void
+  +{abstract} next() : void
+  +{abstract} isDone() : bool
+  +{abstract} currentItem() : T
+}
+
+class AvailableWorkIterator <<ConcreteIterator>> {
+  -items : vector<string>
+  -position : size_t
+  +AvailableWorkIterator(availableItems : vector<string>)
+  +first() : void
+  +next() : void
+  +isDone() : bool
+  +currentItem() : string
+}
+
+class HistoryIterator <<ConcreteIterator>> {
+  -selected : vector<string>
+  -position : size_t
+  +HistoryIterator(entries : vector<string>, order : Order, filter : string)
+  +first() : void
+  +next() : void
+  +isDone() : bool
+  +currentItem() : string
+  +size() : size_t
+}
+
+enum "HistoryIterator::Order" as Order {
+  OldestFirst
+  NewestFirst
+}
+
+class ProgressionTracker <<Aggregate>> {
+  -available : vector<string>
+  +createIterator() : unique_ptr<WorkflowIterator<string>>
+  +availableItems() : vector<string>
+}
+
+class CommandLog <<history source (Gluttony)>> #FFFF66 {
+  +run(command : Command*) : void
+  +describeAll() : vector<string>
+}
+
+interface History <<history source (Gluttony / Sloth)>> #FFFF66 {
+  +{abstract} record(entry : string) : void
+}
+
+class "Interface / reports" as Client <<Client (Lust)>> #FFFF66 {
+}
+
+WorkflowIterator <|-- AvailableWorkIterator : <<bind>> T = string
+WorkflowIterator <|-- HistoryIterator : <<bind>> T = string
+HistoryIterator ..> Order
+ProgressionTracker ..> AvailableWorkIterator : <<create>>
+HistoryIterator ..> CommandLog : iterates describeAll()
+HistoryIterator ..> History : iterates its entries
+Client ..> ProgressionTracker : createIterator()
+Client ..> WorkflowIterator : first / isDone / currentItem / next
+
+note bottom of AvailableWorkIterator
+  Copies the available list when created:
+  completing work mid-loop is safe.
+end note
+note right of ProgressionTracker
+  createIterator() is a Factory Method
+  (GoF: Iterator / Factory Method)
+end note
+@enduml

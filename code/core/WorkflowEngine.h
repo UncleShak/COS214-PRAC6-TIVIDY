@@ -2,16 +2,21 @@
 #define WORKFLOW_ENGINE_H
 
 #include <string>
-#include "WorkflowInstance.h"
+#include <map>
+#include "../workflow/WorkflowInstance.h"
 
 class WorkflowEngine {
+private:
+    std::map<std::string, WorkflowInstance*> activeInstances;
+
 public:
-    virtual ~WorkflowEngine() = default;
+    WorkflowEngine() = default;
+    ~WorkflowEngine();
     
-    // Facade methods
-    virtual WorkflowInstance* startInstance(const std::string& definitionName) = 0;
-    virtual void completeWorkItem(const std::string& instanceId, const std::string& workItemId) = 0;
-    virtual void assignWork(const std::string& instanceId) = 0;
+    // Facade operations to manage workflow execution
+    WorkflowInstance* startInstance(const std::string& instanceId, WorkflowDefinition* def, DataPayload* data);
+    void completeWorkItem(const std::string& instanceId, const std::string& workItemId);
+    void assignWork(const std::string& instanceId, Participant* participant, const std::string& workItemId);
 };
 
 #endif

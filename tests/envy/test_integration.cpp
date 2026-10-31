@@ -31,6 +31,7 @@ class NamedItem : public WorkflowComponent {
 public:
     explicit NamedItem(const std::string& n) : itemName(n) {}
     std::string getName() const override { return itemName; }
+    void request() override {}   // WorkflowComponent::request() (added with the Decorator pattern)
     void add(WorkflowComponent*) override { throw std::logic_error("leaf"); }
     void remove(WorkflowComponent*) override { throw std::logic_error("leaf"); }
     void accept(WorkflowVisitor*) override {}
