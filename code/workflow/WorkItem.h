@@ -3,19 +3,22 @@
 
 // Leaf node and is a single unit of work
 #include <string>
+#include "../observer/EventSource.h"
 #include "WorkflowComponent.h"
-#include "WorkItemState.h"
+#include "../state/WorkItemState.h"
 
 class Participant;
-class Event;
 class WorkflowVisitor;
 
-class WorkItem : public WorkflowComponent{
+class WorkItem : public WorkflowComponent, public EventSource{
     private:
     std::string itemName;
     std::string requiredRole;
     WorkItemState* currentState;
     Participant* assignedParticipant;
+
+    WorkItem(const WorkItem&);
+    WorkItem& operator=(const WorkItem&);
 
     public:
         WorkItem(std::string name, std::string requiredRole );

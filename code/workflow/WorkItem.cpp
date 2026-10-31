@@ -5,7 +5,7 @@
 #include <stdexcept>
 
 WorkItem::WorkItem(std::string name, std::string role) 
-    : itemName(name),requiredRole(role), currentState(new CreatedState()), assignedParticipant(nullptr) {
+    : itemName(name),requiredRole(role), currentState(new CreatedState()), assignedParticipant(nullptr), notificationFailed(false) {
 }
 
 WorkItem::~WorkItem() {
@@ -76,4 +76,11 @@ void WorkItem::remove(WorkflowComponent*) {
     throw std::logic_error(
         "A WorkItem cannot contain child components"
     );
+}
+
+void WorkItem::notifyListeners(Event* event) {
+    if (event == nullptr) throw std::invalid_argument("Event cannot be null");
+    try { EventSource::notifyListeners(*event); }
+    catch (...) { delete event; throw; }
+    delete event;
 }
