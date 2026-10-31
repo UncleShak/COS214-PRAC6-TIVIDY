@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "Participant.h"
+#include "Stage.h"
 #include "WorkItem.h"
 #include "WorkItemState.h"
 
@@ -17,10 +18,9 @@ void AuditReportVisitor::visitWorkItem(WorkItem* item) {
                      " | role: " + item->getRequiredRole());
 }
 
-void AuditReportVisitor::visitStage(Stage*) {
-    // Stage has no public header yet (Pride), so only its position is marked; its
-    // children are visited next and follow this line.
-    report.push_back("-- stage --");
+void AuditReportVisitor::visitStage(Stage* stage) {
+    // Marks where a stage begins; its children are visited next and follow this line.
+    report.push_back("-- stage: " + (stage != nullptr ? stage->getName() : std::string("?")) + " --");
 }
 
 std::string AuditReportVisitor::text() const {

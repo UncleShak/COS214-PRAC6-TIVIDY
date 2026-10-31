@@ -42,24 +42,25 @@ function(tividy_configure target)
   target_include_directories(${target} PRIVATE ${CODE_DIRS})
 endfunction()
 
-# ---- the engine: every .cpp under code/ except the interface's main() ----
+# ---- the engine: every .cpp under code/ except the interface (Lust builds that, below) ----
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS ${CODE}/*.cpp)
-list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/code/app/main\\.cpp$")
+list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/code/app/.*")
+list(FILTER ENGINE_SOURCES EXCLUDE REGEX ".*/code/interface/.*")
 add_library(tividy_engine STATIC ${ENGINE_SOURCES})
 tividy_configure(tividy_engine)
 
-# ---- the interactive application (appears as soon as Lust adds code/app/main.cpp) ----
-if(EXISTS ${CODE}/app/main.cpp)
-  add_executable(tividy ${CODE}/app/main.cpp)
-  target_link_libraries(tividy PRIVATE tividy_engine)
-  tividy_configure(tividy)
-endif()
+# ---- the interactive application and its UI-only test harness (Lust) ----
+# tests/lust pulls in code/interface, which builds the shipped program, tividy, against the real
+# engine. lust_tests is a UI-only harness on a FAKE engine (flagged: it never touches the engine).
+add_subdirectory(tests/lust)
 
 # ---- tests (doctest; the team's doctest.h and the one main() live in tests/envy) ----
 enable_testing()
 set(DOCTEST_DIR ${CMAKE_SOURCE_DIR}/tests/envy)
 
 file(GLOB_RECURSE ALL_TESTS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tests/*/test_*.cpp)
+list(FILTER ALL_TESTS EXCLUDE REGEX ".*/tests/lust/.*")      # own executable and main(), see above
+list(FILTER ALL_TESTS EXCLUDE REGEX ".*/tests/gateway/.*")   # own executable, see below
 add_executable(tividy_tests ${ALL_TESTS})
 target_include_directories(tividy_tests PRIVATE ${DOCTEST_DIR})
 target_link_libraries(tividy_tests PRIVATE tividy_engine)
@@ -69,6 +70,24 @@ add_test(NAME tividy_tests COMMAND tividy_tests)
 # Wrath's tests build from only the code they use, so they run before the whole engine compiles.
 file(GLOB WRATH_SOURCES CONFIGURE_DEPENDS ${CODE}/approval/*.cpp ${CODE}/participants/*.cpp)
 file(GLOB WRATH_TESTS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tests/wrath/test_*.cpp)
+list(FILTER WRATH_TESTS EXCLUDE REGEX ".*/test_invalid_operations\\.cpp$")   # needs WorkItem: runs in tividy_tests
 add_executable(wrath_tests ${WRATH_SOURCES} ${WRATH_TESTS} ${DOCTEST_DIR}/test_main.cpp)
 target_include_directories(wrath_tests PRIVATE ${DOCTEST_DIR})
 tividy_configure(wrath_tests)
+
+# The real gateway the interface uses (code/interface/real), tested against the real engine.
+file(GLOB GATEWAY_TESTS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tests/gateway/test_*.cpp)
+add_executable(gateway_tests ${GATEWAY_TESTS} ${DOCTEST_DIR}/test_main.cpp)
+target_include_directories(gateway_tests PRIVATE ${DOCTEST_DIR})
+target_link_libraries(gateway_tests PRIVATE tividy_real_engine)
+tividy_configure(gateway_tests)
+add_test(NAME gateway_tests COMMAND gateway_tests)
+
+# The demo scripts run through the shipped program in --plain mode and must finish cleanly.
+file(GLOB DEMO_SCRIPTS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tests/scripts/*.txt)
+foreach(script ${DEMO_SCRIPTS})
+  get_filename_component(name ${script} NAME_WE)
+  add_test(NAME demo_${name}
+           COMMAND ${CMAKE_COMMAND} -DPROGRAM=$<TARGET_FILE:tividy> -DSCRIPT=${script}
+                   -P ${CMAKE_SOURCE_DIR}/tests/scripts/run_script.cmake)
+endforeach()

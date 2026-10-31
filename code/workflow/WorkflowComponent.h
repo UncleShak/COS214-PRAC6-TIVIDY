@@ -3,6 +3,7 @@
 
 // The generic base for individual tasks and a group of tasks
 
+#include <stdexcept>
 #include <string>
 
 class WorkflowVisitor;
@@ -22,6 +23,17 @@ class WorkflowComponent {
 
         //visitor methods
         virtual void accept(WorkflowVisitor* visitor) = 0;
+
+        // Proxy: asks whether `action` ("assign", "start", "complete", "reject", "cancel",
+        // "escalate") may happen. Real work allows everything; AccessControlProxy throws
+        // AccessDenied when its AccessPolicy refuses. Commands call it before acting.
+        virtual void authorize(const std::string& action) const { (void)action; }
+
+        // Prototype: a deep copy with fresh runtime state, so every WorkflowInstance gets its own
+        // tree. WorkItem and Stage override it; anything else cannot sit in a definition's tree.
+        virtual WorkflowComponent* clone() const {
+            throw std::logic_error("'" + getName() + "' cannot be copied into a workflow instance");
+        }
 };
 
 #endif

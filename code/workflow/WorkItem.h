@@ -5,12 +5,13 @@
 #include <string>
 #include "WorkflowComponent.h"
 #include "WorkItemState.h"
+#include "EventSource.h"
 
 class Participant;
-class Event;
 class WorkflowVisitor;
 
-class WorkItem : public WorkflowComponent{
+// Observer: a WorkItem is the Subject; listeners hear every state change.
+class WorkItem : public WorkflowComponent, public EventSource {
     private:
     std::string itemName;
     std::string requiredRole;
@@ -42,13 +43,23 @@ class WorkItem : public WorkflowComponent{
         void cancel();
         void escalate();
 
+        // Prototype: same name and role, fresh CreatedState, no assignee, no listeners.
+        WorkflowComponent* clone() const override;
+
+        // Engine-only operations that bypass the State rules on purpose:
+        // reopen() puts finished work back to Created for a retry loop (ProgressionResult::reopened);
+        // restoreState() is used by Memento rollback.
+        void reopen();
+        void restoreState(WorkItemState* state, Participant* assignee);
+
          // Composite interface
         void add(WorkflowComponent* component) override;
         void remove(WorkflowComponent* component) override;
         void accept(WorkflowVisitor* visitor) override;
 
         // observer pattern
-        void notifyListeners(Event* event);
+        using EventSource::notifyListeners;
+        void notifyListeners(Event* event); // takes ownership of event
 };
 
 #endif

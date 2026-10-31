@@ -2,6 +2,8 @@
 #include "WorkItemState.h"
 #include "CreatedState.h" // Default starting state
 #include "Event.h"        // For Observer notification
+#include "WorkflowVisitor.h"
+#include <memory>
 #include <stdexcept>
 
 WorkItem::WorkItem(std::string name, std::string role) 
@@ -33,9 +35,9 @@ void WorkItem::changeState(WorkItemState* newState) {
     currentState = newState;
     
     // Observer pattern: Notify listeners (like WorkflowInstance) that state changed
-    notifyListeners(new Event("STATE_CHANGED", this));
-
+    const std::string oldName = oldState != nullptr ? oldState->getStateName() : "";
     delete oldState;
+    notifyListeners(new Event("STATE_CHANGED", itemName, oldName, newState->getStateName()));
 }
 
 WorkItemState* WorkItem::getCurrentState() const {
@@ -76,4 +78,33 @@ void WorkItem::remove(WorkflowComponent*) {
     throw std::logic_error(
         "A WorkItem cannot contain child components"
     );
+}
+
+// Visitor: ConcreteElement
+void WorkItem::accept(WorkflowVisitor* visitor) {
+    if (visitor == nullptr) throw std::invalid_argument("Visitor cannot be null");
+    visitor->visitWorkItem(this);
+}
+
+void WorkItem::notifyListeners(Event* event) {
+    std::unique_ptr<Event> owned(event);
+    if (owned) EventSource::notifyListeners(*owned);
+}
+
+WorkflowComponent* WorkItem::clone() const {
+    return new WorkItem(itemName, requiredRole);
+}
+
+void WorkItem::reopen() {
+    assignedParticipant = nullptr;
+    changeState(new CreatedState());
+}
+
+void WorkItem::restoreState(WorkItemState* state, Participant* assignee) {
+    assignedParticipant = assignee;
+    if (state != nullptr && currentState != nullptr && state->getStateName() == currentState->getStateName()) {
+        delete state;
+        return;
+    }
+    changeState(state);
 }
