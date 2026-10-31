@@ -55,6 +55,15 @@ void ArkhamExpressBuilder::buildRules() {
     buildDependency("Dispatch", "AssignDriver");
     buildDependency("Deliver", "Dispatch");
     buildDependency("CloseOrder", "Deliver");
+    // Decorators: delivery has a deadline; the external stock request is audited.
+    buildDeadline("Deliver", 10);
+    buildAudit("RequestStock");
+    // Proxy policy: only delivery management may cancel work in an order.
+    buildAccessRule("cancel", {"DeliveryManager"});
+    // Observer: the customer cancels mid-order. Open fulfilment work stops; CancelOrder opens.
+    buildInterrupt("CUSTOMER_CANCELLED",
+                   {"CheckStock", "RequestStock", "PreparePackage", "SelectDeliveryType", "AssignDriver", "Dispatch"},
+                   {"CancelOrder"});
 }
 void ArkhamExpressBuilder::buildConnectors() {
     buildConnector("RequestStock", warehouse, "requestStock");
