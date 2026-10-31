@@ -1,13 +1,19 @@
 /**
  * @file TuiFrontEnd.h
- * @brief The ncurses front end: draws the panes and turns key presses into controller calls.
+ * @brief The ncurses front end: draws the screens and turns key presses into controller calls.
  *
  * No engine or workflow logic lives here. Everything the user does goes through
  * InterfaceController, and everything drawn comes from its SessionView.
  *
- * Skeleton (30 Oct): header, industry list, detail pane, status bar, arrow-key selection,
- * resize handling, the too-small screen and quit. The other screens from
- * docs/tui-plan.md section 4 follow.
+ * Screens (docs/tui-plan.md section 4):
+ * - Industries: pick the industry to work in.
+ * - Instances: the industry's workflow instances; start a new one with a form.
+ * - Dashboard: work items and their states; actions, approvals, the clock, and a result
+ *   panel showing each state change and routing decision (or the engine's refusal).
+ * - History: the instance's history through Envy's HistoryIterator (order, filter).
+ * - Reports: the Progress, Audit and Overdue visitor reports.
+ * Plus help (?), a command bar (:) that accepts the same commands as --plain, and the
+ * "terminal too small" screen.
  *
  * @author Shakir Alexander (Lust)
  */
@@ -15,12 +21,15 @@
 #define TIVIDY_TUI_FRONT_END_H
 
 #include <string>
+#include <vector>
 
 #include <curses.h>
 
 #include "InterfaceController.h"
 #include "Layout.h"
+#include "LineInterpreter.h"
 #include "Theme.h"
+#include "Widgets.h"
 
 namespace tividy {
 namespace ui {
@@ -35,22 +44,95 @@ public:
     void run();
 
 private:
+    enum class Screen { Industries, Instances, Dashboard, History, Reports };
+    enum class Pane { List, Detail };
+
+    // ---- keys
+    /** @return true if @p key was a global key and has been handled */
+    bool handleGlobal(int key);
+    void handleIndustries(int key);
+    void handleInstances(int key);
+    void handleDashboard(int key);
+    void handleHistory(int key);
+    void handleReports(int key);
+    /** @brief Up/Down/PgUp/PgDn/Home/End on a list of @p count rows. @return true if handled */
+    bool moveSelection(int key, int count);
+    /** @brief The same keys, scrolling @p top instead of moving a selection. */
+    static bool scrollBy(int key, int& top);
+
+    // ---- actions
+    void enter(Screen screen);
+    /** @brief After a typed command, shows the screen matching what the controller has selected. */
+    void followController();
+    void openIndustry();
+    void openInstance();
+    void newInstance();
+    void chooseActor();
+    void actionMenu();
+    void approvalsMenu();
+    void advanceClock();
+    void runCommand();
+    void showHelp();
+    void quit();
+    void loadHistory();
+    void loadReports();
+    /** @brief Fills the result panel from the controller's last outcome. */
+    void showOutcome();
+    /** @brief Fills the result panel with a refusal and the item's (unchanged) state. */
+    void showRefusal(const std::string& itemId, const std::string& stateBefore, const std::string& message);
+    /** @brief Selects the dashboard row of @p itemId, if it is still listed. */
+    void reselect(const std::string& itemId);
+
+    // ---- what the screens show
+    const std::vector<WorkItemView>& items() const;
+    const WorkItemView* selectedItem() const;
+    const WorkItemView* findItem(const std::string& itemId) const;
+    std::string industryName() const;
+    int rowCount() const;
+    std::vector<Line> listRows(int width) const;
+    std::vector<Line> detailLines() const;
+    std::vector<Line> bodyLines() const;
+    std::string listTitle() const;
+    std::string emptyListText() const;
+    std::string breadcrumb() const;
+    std::string headerRight() const;
+    std::string hints() const;
+
+    // ---- drawing
     void draw();
     void drawTooSmall();
     void drawHeader();
-    void drawList();
-    void drawDetail();
+    void drawPanes();
+    void drawBody();
     void drawStatus();
 
-    /** @brief Box with a title; gold border when the pane has focus. */
-    void frame(WINDOW* window, const std::string& title, bool focused);
-    /** @brief Writes @p text at (y, x), cut to fit the window width minus @p margin. */
-    static void put(WINDOW* window, int y, int x, const std::string& text, Tone tone, int margin = 1);
-
     InterfaceController& controller_;
+    LineInterpreter interpreter_;
     std::string engineLabel_;
     Layout layout_;
+    StatusMessage status_;
+
+    Screen screen_;
+    Pane focus_;
     int selected_;
+    int listTop_;
+    int detailTop_;
+    int bodyTop_;
+    bool availableOnly_;  ///< dashboard lists the available work only
+
+    bool showPanel_;      ///< dashboard detail pane shows the result panel
+    std::string panelTitle_;
+    std::vector<Line> panel_;
+
+    std::vector<std::string> historyLines_;
+    bool newestFirst_;
+    std::string filter_;
+
+    int reportTab_;       ///< 0 Progress, 1 Audit, 2 Overdue
+    std::string progress_;
+    std::vector<std::string> audit_;
+    std::vector<std::string> overdue_;
+
     bool running_;
 };
 

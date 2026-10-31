@@ -1,12 +1,15 @@
 /**
  * @file Layout.h
- * @brief The four ncurses windows (header, list, detail, status) and their sizes.
+ * @brief The ncurses windows (header, list, detail, body, status) and their sizes.
  *
  * @code
  *   row 0            header  (full width)
- *   rows 1..H-3      list (40%) | detail (60%)
+ *   rows 1..H-3      list (40%) | detail (60%)     or     body (full width)
  *   rows H-2..H-1    status: key hints, then the last message
  * @endcode
+ *
+ * The body window covers the same rows as list + detail. A screen draws either the two
+ * panes (pickers, dashboard) or the body (history, reports), never both.
  *
  * Rebuilt from scratch on every terminal resize. Below the minimum size no windows exist
  * and the front end shows a "terminal too small" message instead.
@@ -38,6 +41,7 @@ public:
     WINDOW* header() const { return header_; }
     WINDOW* list() const { return list_; }
     WINDOW* detail() const { return detail_; }
+    WINDOW* body() const { return body_; }
     WINDOW* status() const { return status_; }
 
 private:
@@ -49,6 +53,7 @@ private:
     WINDOW* header_;
     WINDOW* list_;
     WINDOW* detail_;
+    WINDOW* body_;
     WINDOW* status_;
     bool tooSmall_;
 };

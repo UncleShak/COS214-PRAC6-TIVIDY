@@ -43,6 +43,7 @@ if(TIVIDY_WITH_CURSES)
         tui/Layout.cpp
         tui/Theme.cpp
         tui/TuiFrontEnd.cpp
+        tui/Widgets.cpp
     )
     target_include_directories(tividy_tui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tui ${CURSES_INCLUDE_DIRS})
     target_compile_definitions(tividy_tui PUBLIC TIVIDY_WITH_CURSES NCURSES_WIDECHAR=1)
