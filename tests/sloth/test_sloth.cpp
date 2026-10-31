@@ -6,7 +6,9 @@
  *
  * @author Sloth (The Archivist)
  */
+#ifdef STANDALONE_TEST
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#endif
 #include "doctest.h"
 
 #include "Event.h"
