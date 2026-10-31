@@ -1,0 +1,142 @@
+#include "ApprovalDesk.h"
+#include "ApprovalHandler.h"
+#include "Clock.h"
+#include "History.h"
+#include "Participant.h"
+#include "WorkflowException.h"
+
+#include <stdexcept>
+#include <string>
+
+ApprovalDesk::ApprovalDesk(ApprovalHandler* chain, const Clock* clock, History* history)
+    : chain(chain), clock(clock), history(history), nextId(1) {
+
+    if(chain == nullptr){
+
+        throw std::invalid_argument("ApprovalDesk: chain cannot be null");
+    }
+    if(clock == nullptr){
+
+        throw std::invalid_argument("ApprovalDesk: clock cannot be null");
+    }
+    if(history == nullptr){
+
+        throw std::invalid_argument("ApprovalDesk: history cannot be null");
+    }
+}
+
+ApprovalDesk::~ApprovalDesk() = default;
+
+const ApprovalRequest* ApprovalDesk::submit(const std::string& itemName, const Participant* requestedBy, double value, const std::string& reason) {
+
+    if(requestedBy == nullptr){
+      
+        throw std::invalid_argument("ApprovalDesk::submit: requestedBy cannot be null");
+    }
+
+    if(hasPending(itemName)){
+
+        throw InvalidTransition("ApprovalDesk::submit: '" + itemName + "' already has a PENDING request");
+    }
+
+    const int now = clock->now();
+
+    std::unique_ptr<ApprovalRequest> request(new ApprovalRequest(nextId, itemName, requestedBy->getName(), value, reason, now));
+
+    chain->handleRequest(request.get(), now);
+
+    ApprovalRequest* stored = request.get();
+    requests.push_back(std::move(request));
+    ++nextId;
+
+    history->record("approval " + stored->describe());
+    return stored;
+}
+
+ApprovalStatus ApprovalDesk::decide(int requestId,
+                                    const Participant& actor,
+                                    bool approve,
+                                    const std::string& note) {
+
+    ApprovalRequest* request = nullptr;
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        if (requests[i]->getId() == requestId) {
+            request = requests[i].get();
+            break;
+        }
+    }
+    if (request == nullptr) {
+        throw std::out_of_range("ApprovalDesk::decide: unknown request id " +
+                                std::to_string(requestId));
+    }
+    if (request->getStatus() != PENDING) {
+        throw InvalidTransition("ApprovalDesk::decide: request #" +
+                                std::to_string(requestId) + " is already " +
+                                statusName(request->getStatus()));
+    }
+
+    ApprovalHandler* handler = request->getHandler();
+    if (handler == nullptr || !handler->mayDecide(actor)) {
+        throw AccessDenied("ApprovalDesk::decide: " + actor.getName() +
+                           " does not hold the role required at '" +
+                           (handler != nullptr ? handler->getName() : std::string("(unassigned)")) + "'");
+    }
+
+    const ApprovalStatus newStatus = approve ? APPROVED : REJECTED;
+    request->resolve(newStatus, actor.getName(), note);
+    history->record("approval " + request->describe());
+    return newStatus;
+}
+
+std::vector<const ApprovalRequest*> ApprovalDesk::checkDeadlines() {
+
+    std::vector<const ApprovalRequest*> moved;
+    const int now = clock->now();
+
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        ApprovalRequest* request = requests[i].get();
+        if (request->getStatus() != PENDING || !request->isOverdue(now)) {
+            continue;
+        }
+        ApprovalHandler* handler = request->getHandler();
+        if (handler != nullptr) {
+            handler->escalate(request, now);
+        }
+        history->record("approval escalated: " + request->describe());
+        moved.push_back(request);
+    }
+    return moved;
+}
+
+std::vector<const ApprovalRequest*> ApprovalDesk::pending() const {
+
+    std::vector<const ApprovalRequest*> result;
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        if (requests[i]->getStatus() == PENDING) {
+            result.push_back(requests[i].get());
+        }
+    }
+    return result;
+}
+
+const ApprovalRequest* ApprovalDesk::get(int requestId) const {
+
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        if (requests[i]->getId() == requestId) {
+            return requests[i].get();
+        }
+    }
+    throw std::out_of_range("ApprovalDesk::get: unknown request id " +
+                            std::to_string(requestId));
+}
+
+bool ApprovalDesk::hasPending(const std::string& itemName) const {
+
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        if (requests[i]->getStatus() == PENDING &&
+            requests[i]->getItemName() == itemName) {
+            return true;
+        }
+    }
+    return false;
+}
