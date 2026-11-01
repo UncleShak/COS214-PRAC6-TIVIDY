@@ -42,6 +42,11 @@ void ArkhamExpressBuilder::buildRules() {
     buildPath("Dispatch", "Deliver");
     buildBranch("Deliver", RoutingCondition::equals("delivered", "yes"), {"CloseOrder"});
     buildDefaultBranch("Deliver", {"ReturnToWarehouse"});
+    // A rejected step cancels the order (Bug 1). Without these, a rejection followed the
+    // success path into a step that waits on the rejected one, and the order stalled.
+    const char* const rejectable[] = {"ReceiveOrder", "ValidateOrder", "CheckStock", "PreparePackage",
+                                      "SelectDeliveryType", "AssignDriver", "Dispatch", "Deliver"};
+    for (const char* item : rejectable) buildRejectionPath(item, {"CancelOrder"});
     buildDependency("ValidateOrder", "ReceiveOrder");
     buildDependency("CheckStock", "ValidateOrder");
     buildDependency("RequestStock", "CheckStock");
@@ -62,7 +67,9 @@ void ArkhamExpressBuilder::buildRules() {
     buildAccessRule("cancel", {"DeliveryManager"});
     // Observer: the customer cancels mid-order. Open fulfilment work stops; CancelOrder opens.
     buildInterrupt("CUSTOMER_CANCELLED",
-                   {"CheckStock", "RequestStock", "PreparePackage", "SelectDeliveryType", "AssignDriver", "Dispatch"},
+                   {"ReceiveOrder", "ValidateOrder", "CheckStock", "RequestStock", "PreparePackage",
+                    "SelectDeliveryType", "AssignDriver", "Dispatch", "Deliver", "CloseOrder",
+                    "HandleStockFailure", "ReturnToWarehouse"},
                    {"CancelOrder"});
 }
 void ArkhamExpressBuilder::buildConnectors() {

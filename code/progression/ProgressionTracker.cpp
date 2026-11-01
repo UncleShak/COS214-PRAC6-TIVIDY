@@ -92,6 +92,16 @@ void ProgressionTracker::cancel(const std::string& item) {
     cancelled.insert(item);
 }
 
+void ProgressionTracker::block(const std::string& item) {
+    if (!started) throw std::logic_error("Cannot interrupt an instance before start");
+    if (isAvailable(item) || isWaiting(item)) cancel(item);
+    blocked.insert(item);
+}
+
+bool ProgressionTracker::isBlocked(const std::string& item) const {
+    return blocked.count(item) > 0;
+}
+
 std::string ProgressionTracker::nameOf(const WorkflowComponent* item) {
     if (item == nullptr) {
         throw std::invalid_argument("ProgressionTracker: work item cannot be null");
@@ -199,6 +209,7 @@ ProgressionState ProgressionTracker::saveProgress() const {
     state.completed = completed;
     state.rejected = rejected;
     state.cancelled = cancelled;
+    state.blocked = blocked;
     return state;
 }
 
@@ -209,4 +220,5 @@ void ProgressionTracker::restoreProgress(const ProgressionState& state) {
     completed = state.completed;
     rejected = state.rejected;
     cancelled = state.cancelled;
+       blocked = state.blocked;
 }

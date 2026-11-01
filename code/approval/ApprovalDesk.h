@@ -97,6 +97,8 @@ public:
 
     /** @brief True if itemName has a PENDING request. */
     bool hasPending(const std::string& itemName) const;
+     // Close a stopped task's pending requests without routing a rejection path.
+    void cancelPending(const std::string& itemName, const std::string& reason);
     
 // Plain values saved by an instance snapshot. Handler pointers are borrowed
     // from the definition, which must outlive its instances and snapshots.

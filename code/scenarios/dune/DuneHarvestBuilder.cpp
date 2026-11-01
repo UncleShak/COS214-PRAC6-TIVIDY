@@ -32,6 +32,10 @@ void DuneHarvestBuilder::buildRules() {
     buildPath("DeployHarvester", "Harvest");
     buildPath("DeployCarryall", "Harvest");
     buildPath("Harvest", "TransportToRefinery");
+// A rejected step abandons the run (Bug 1); see ArkhamExpressBuilder.
+    const char* const rejectable[] = {"SurveyField", "ApproveHarvestPermit", "DeployHarvester",
+                                      "DeployCarryall", "Harvest"};
+    for (const char* item : rejectable) buildRejectionPath(item, {"AbandonRun"});
 
     buildDependency("ApproveHarvestPermit", "SurveyField");
     buildDependency("Harvest", "DeployHarvester");   // the harvester waits for both machines
@@ -52,7 +56,11 @@ void DuneHarvestBuilder::buildRules() {
     buildAudit("Harvest");
 
     buildAccessRule("cancel", {"OperationsManager"});
-    buildInterrupt("WORM_SIGN", {"DeployHarvester", "DeployCarryall", "Harvest"}, {"Evacuate"});
+    // Collected spice may still ship if Harvest was already completed.
+    buildInterrupt("WORM_SIGN",
+                   {"SurveyField", "ApproveHarvestPermit", "AbandonRun", "DeployHarvester",
+                    "DeployCarryall", "Harvest"},
+                   {"Evacuate"});
 }
 
 void DuneHarvestBuilder::buildConnectors() {}

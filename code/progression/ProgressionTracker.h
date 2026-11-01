@@ -43,6 +43,7 @@ struct ProgressionState {
     std::set<std::string> completed;
     std::set<std::string> rejected;
     std::set<std::string> cancelled;
+    std::set<std::string> blocked; // Interrupt-cancelled paths cannot be reopened.
     ProgressionState() : started(false) {}
 };
 
@@ -64,6 +65,10 @@ public:
     ProgressionResult reject(const std::string& item, const DataPayload& instanceData);
     /// Item abandoned (WorkItem -> CancelledState): no routing, removed from available/waiting.
     void cancel(const std::string& item);
+    // Interrupt-only cancellation: also prevent future routing into this task.
+    // Unlike ordinary cancel(), accepts tasks that have not been reached yet.
+    void block(const std::string& item);
+    bool isBlocked(const std::string& item) const;
 
     /// Reaches an item outside the routing rule (an interrupt, e.g. an event opens an evacuation
     /// step). Same rules as routing: waits on unmet prerequisites, reopens finished work.

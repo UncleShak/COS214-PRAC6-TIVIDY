@@ -185,3 +185,15 @@ void ApprovalDesk::restore(const Snapshot& snapshot) {
     requests.swap(restored);
     nextId = snapshot.nextId;
 }
+
+void ApprovalDesk::cancelPending(const std::string& itemName, const std::string& reason) {
+    for (std::size_t i = 0; i < requests.size(); ++i) {
+        ApprovalRequest* request = requests[i].get();
+        if (request->getItemName() == itemName && request->getStatus() == PENDING) {
+            // The existing status enum has no Cancelled value. EXPIRED means
+            // this request is no longer actionable; the note states the cause.
+            request->resolve(EXPIRED, "System", reason);
+            history->record("approval cancelled: " + request->describe());
+        }
+    }
+}
