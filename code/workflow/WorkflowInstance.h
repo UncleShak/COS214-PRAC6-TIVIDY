@@ -92,6 +92,7 @@ class WorkflowInstance : public EventSource, public EventListener {
         WorkflowComponent* workOf(WorkItem* item) const;   // outermost decorator, or the item
         void setField(const std::string& key, const std::string& value);
         void recordOutcome(const std::string& item, const std::string& outcome);
+        void recordDropped(const ProgressionResult& result);
         void submitApproval(const std::string& name, Participant* requester);
         const ApprovalRequest* latestApproval(const std::string& name) const;
         void finishApproved(const std::string& name);

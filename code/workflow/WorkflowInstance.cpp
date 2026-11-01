@@ -13,7 +13,6 @@
 #include "InterruptListener.h"
 #include "KeyValuePayload.h"
 #include "RoutingCondition.h"
-#include "RoutingCondition.h"
 #include "Stage.h"
 #include "StateFactory.h"
 #include "WorkItem.h"
@@ -155,9 +154,17 @@ void WorkflowInstance::apply(const ProgressionResult& result) {
     for (std::size_t i = 0; i < result.reopened.size(); ++i) getItem(result.reopened[i])->reopen();
     for (std::size_t i = 0; i < result.madeAvailable.size(); ++i) open(result.madeAvailable[i]);
     if (!result.decision.description.empty()) history.record("Routing: " + result.decision.description);
+    recordDropped(result);
     if (result.instanceComplete) history.record("Instance " + instanceId + " complete");
     lastProgression = result;
     routedLast = true;
+}
+
+// Steps the tracker dropped because a prerequisite was cancelled or rejected. They were never
+// opened, so their WorkItem stays Created; the history says why they will not run.
+void WorkflowInstance::recordDropped(const ProgressionResult& result) {
+    for (std::size_t i = 0; i < result.dropped.size(); ++i)
+        history.record("Skipped '" + result.dropped[i] + "': a step it needs was cancelled or rejected");
 }
 
 void WorkflowInstance::open(const std::string& name) {
@@ -264,7 +271,7 @@ void WorkflowInstance::cancelWork(const std::string& name, Participant* actor) {
     beginAction();
     WorkItem* item = getItem(name);
     runCommand(new CancelCommand(item, actor, guard(item, actor)));
-    tracker->cancel(name);
+    recordDropped(tracker->cancel(name));
     if (tracker->isComplete()) history.record("Instance " + instanceId + " complete");
 }
 
@@ -317,7 +324,6 @@ void WorkflowInstance::finishRejected(const std::string& name, Participant* deci
     setField(definition->getApprovalRule(name)->resultField, "no");
     runCommand(new RejectCommand(item, decider, reason));
     recordOutcome(name, "rejected");
-        recordOutcome(name, "rejected");
     apply(tracker->reject(name, *payload));
 }
 
