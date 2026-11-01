@@ -50,12 +50,20 @@ class WorkflowDefinition {
             std::string resultField;
         };
 
+        // Route map for the interface: an exception route leaves the main line at `splitsFrom`
+        // and runs through `items`. Descriptive only; routing itself is unchanged.
+        struct ExceptionRoute {
+            std::string splitsFrom;
+            std::vector<std::string> items;
+        };
+
     private:
         WorkflowComponent* rootStage;
         std::string definitionVersion;
         std::vector<EndOutcome> endOutcomes;
         std::string identityField; // Bound to the runtime ID; never editable.
         std::set<std::string> cancellationItems;
+        std::vector<ExceptionRoute> exceptionRoutes;
 
         // Filled in by a ScenarioBuilder (Builder pattern)
         std::vector<std::string> entryItems;
@@ -81,6 +89,8 @@ class WorkflowDefinition {
 
         const std::string& getIdentityField() const { return identityField; }
         bool isCancellationItem(const std::string& item) const { return cancellationItems.count(item) != 0; }
+        // In declaration order. An item is on the first route that lists it.
+        const std::vector<ExceptionRoute>& getExceptionRoutes() const { return exceptionRoutes; }
         const std::vector<std::string>& getEntryItems() const;
         const DependencyGraph& getDependencies() const;
         RoutingRule* getRoutingRule() const;

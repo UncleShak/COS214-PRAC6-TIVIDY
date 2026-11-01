@@ -38,3 +38,4 @@ std::unique_ptr<DataPayload> DuneHarvestFactory::createInitialData(const std::st
 std::vector<std::string> DuneHarvestFactory::getEventTypes() const {
     return std::vector<std::string>(1, "WORM_SIGN");
 }
+std::string DuneHarvestFactory::getSector() const { return "Mining"; }

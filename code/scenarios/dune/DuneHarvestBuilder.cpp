@@ -40,6 +40,9 @@ void DuneHarvestBuilder::buildRules() {
     buildEndOutcome("Evacuate", "evacuated");
     buildEndOutcome("AbandonRun", "abandoned");
     buildEndOutcome("TransportToRefinery", "succeeded");
+    // Route map for the interface: where each exception branch leaves the main line.
+    buildExceptionRoute("ApproveHarvestPermit", {"AbandonRun"});
+    buildExceptionRoute("Harvest", {"Evacuate"});
     buildDependency("ApproveHarvestPermit", "SurveyField");
     buildDependency("Harvest", "DeployHarvester");   // the harvester waits for both machines
     buildDependency("Harvest", "DeployCarryall");

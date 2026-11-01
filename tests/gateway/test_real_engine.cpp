@@ -43,6 +43,31 @@ bool has(const std::vector<std::string>& list, const std::string& value) {
 
 TEST_SUITE("gateway") {
 
+TEST_CASE("route map: main line and exception branches, in definition order") {
+    RealEngine engine;
+    CHECK(engine.listIndustries()[0].sector == "Logistics");
+    CHECK(engine.listIndustries()[1].sector == "Mining");
+
+    const std::vector<RouteStop> arkham = engine.routeMap(ARKHAM, ARKHAM);
+    REQUIRE(arkham.size() == 13);
+    CHECK(arkham[0].workItemId == "ReceiveOrder");
+    CHECK_FALSE(arkham[0].exception);
+    std::vector<std::string> exceptions;
+    for (std::size_t i = 0; i < arkham.size(); ++i) {
+        if (arkham[i].exception) exceptions.push_back(arkham[i].workItemId + "<" + arkham[i].splitsFrom);
+        else CHECK(arkham[i].splitsFrom.empty());
+    }
+    CHECK(exceptions == std::vector<std::string>{"CancelOrder<ValidateOrder", "HandleStockFailure<RequestStock",
+                                                 "ReturnToWarehouse<Deliver"});
+
+    const std::vector<RouteStop> dune = engine.routeMap(DUNE, DUNE);
+    int duneExceptions = 0;
+    for (std::size_t i = 0; i < dune.size(); ++i) duneExceptions += dune[i].exception ? 1 : 0;
+    CHECK(dune.size() == 8);
+    CHECK(duneExceptions == 2);
+    CHECK_THROWS_AS(engine.routeMap(ARKHAM, DUNE), std::invalid_argument);
+}
+
 TEST_CASE("industries, their forms and their people come from the factories") {
     RealEngine engine;
     const std::vector<IndustryInfo> industries = engine.listIndustries();
