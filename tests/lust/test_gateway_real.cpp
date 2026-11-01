@@ -194,6 +194,8 @@ TEST_CASE("gateway: startInstance only takes the fields it offered, and ids are 
     CHECK(keys.count("quantity") == 1);
     for (std::size_t i = 0; i < form.size(); ++i)
         if (form[i].key == "quantity" || form[i].key == "distanceKm") CHECK(form[i].numeric);
+    for (std::size_t i = 0; i < form.size(); ++i)
+        if (form[i].key == "delivered" || form[i].key == "inStock") CHECK(form[i].yesNo);
 
     const std::string a = w.ax();
     const std::string b = w.ax();

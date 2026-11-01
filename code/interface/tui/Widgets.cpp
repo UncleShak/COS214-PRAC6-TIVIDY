@@ -352,6 +352,8 @@ bool Dialog::form(const std::string& title, const std::vector<DataField>& fields
         std::string label = fields[i].label;
         if (fields[i].numeric) {
             label += " (number)";
+        } else if (fields[i].yesNo) {
+            label += " (yes/no)";
         }
         if (fields[i].required) {
             label += " *";

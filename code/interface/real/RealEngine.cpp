@@ -47,6 +47,9 @@ bool isNumber(const std::string& text) {
     return end != 0 && *end == '\0';
 }
 
+// The example data writes yes/no answers as "yes" or "no".
+bool isYesNo(const std::string& text) { return text == "yes" || text == "no"; }
+
 std::string approvalKey(int id) { return "APR-" + std::to_string(id); }
 
 // Accepts "APR-3", "apr-3" or "3".
@@ -118,6 +121,7 @@ std::vector<DataField> RealEngine::startFields(const std::string& industryId, co
         field.key = it->first;
         field.label = labelFor(it->first);
         field.numeric = isNumber(it->second);
+        field.yesNo = isYesNo(it->second);
         field.required = false;
         field.defaultValue = it->second;
         form.push_back(field);

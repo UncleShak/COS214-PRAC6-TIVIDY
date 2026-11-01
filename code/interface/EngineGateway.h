@@ -44,6 +44,7 @@ struct DataField {
     bool numeric;             ///< must parse like KeyValuePayload::getNumber
     bool required;            ///< empty input refused
     std::string defaultValue; ///< used when the user leaves an optional field empty
+    bool yesNo;               ///< must be yes/no (y/n, true/false); sent as "yes" or "no"
 };
 
 /** @brief A participant who can act on or be assigned work. */

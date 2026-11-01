@@ -307,7 +307,7 @@ Reply LineInterpreter::start(const std::vector<std::string>& args) {
     }
     std::string usage = "start";
     for (std::size_t i = 0; i < fields.size(); ++i) {
-        std::string pair = fields[i].key + "=<" + (fields[i].numeric ? "number" : "text") + ">";
+        std::string pair = fields[i].key + "=<" + (fields[i].numeric ? "number" : fields[i].yesNo ? "yes/no" : "text") + ">";
         usage += " " + (fields[i].required ? pair : "[" + pair + "]");
     }
 
