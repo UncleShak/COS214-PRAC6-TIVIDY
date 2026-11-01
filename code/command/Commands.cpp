@@ -61,11 +61,14 @@ std::string CompleteCommand::describe() const {
     return actor->getName() + " completed " + quoted(item);
 }
 
-RejectCommand::RejectCommand(WorkItem* i, Participant* a, const std::string& reason, WorkflowComponent* t)
-    : Command(i, a, t), reason(reason) {}
+RejectCommand::RejectCommand(WorkItem* i, Participant* a, const std::string& reason, WorkflowComponent* t,
+                             bool byApprovalChain)
+    : Command(i, a, t), reason(reason), byApprovalChain(byApprovalChain) {}
 
 void RejectCommand::execute() {
     target->authorize("reject");
+    // Bug 7: holding the right role is not enough; you must be the one doing the work.
+    if (!byApprovalChain) requireAssignee();
     item->reject();
     if (item->getAssignedParticipant() != nullptr) {
         item->getAssignedParticipant()->workFinished();

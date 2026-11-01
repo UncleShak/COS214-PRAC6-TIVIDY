@@ -350,9 +350,8 @@ void WorkflowInstance::finishApproved(const std::string& name) {
 void WorkflowInstance::finishRejected(const std::string& name, Participant* decider, const std::string& reason) {
     WorkItem* item = getItem(name);
     setField(definition->getApprovalRule(name)->resultField, "no");
-    runCommand(new RejectCommand(item, decider, reason));
+    runCommand(new RejectCommand(item, decider, reason, nullptr, true));   // the approver decides
     recordOutcome(name, "rejected");
-        recordOutcome(name, "rejected");
     apply(tracker->reject(name, *payload));
 }
 

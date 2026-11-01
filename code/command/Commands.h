@@ -73,13 +73,16 @@ public:
 class RejectCommand : public Command {
 public:
     /** @param reason Why the work was rejected; shown in history and the interface. */
-    RejectCommand(WorkItem* i, Participant* a, const std::string& reason, WorkflowComponent* target = nullptr);
+    /** @param byApprovalChain true only when an approver (not the assignee) decides the outcome. */
+    RejectCommand(WorkItem* i, Participant* a, const std::string& reason, WorkflowComponent* target = nullptr,
+                  bool byApprovalChain = false);
     void execute() override;
     std::string describe() const override;
     const std::string& getReason() const { return reason; }
 
 private:
     std::string reason;
+    bool byApprovalChain;
 };
 
 /** @brief Cancels work that has not finished and frees the assignee, if there is one. */

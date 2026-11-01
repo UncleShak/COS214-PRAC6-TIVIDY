@@ -3,6 +3,7 @@
 #include "../core/WorkflowException.h"
 #include "Clock.h"
 
+#include <climits>
 #include <stdexcept>
 #include <string>
 
@@ -14,7 +15,8 @@ DeadlineDecorator::DeadlineDecorator(WorkflowComponent* c, int duration, const C
     if (duration < 0) {
         throw std::invalid_argument("DeadlineDecorator duration cannot be negative");
     }
-    dueTime = clock->now() + duration;
+    // Bug 20: a due time past INT_MAX would wrap negative; such a deadline never arrives.
+    dueTime = clock->now() > INT_MAX - duration ? INT_MAX : clock->now() + duration;
 }
 
 void DeadlineDecorator::request() {

@@ -28,6 +28,8 @@ void ArkhamExpressBuilder::buildRules() {
     buildEntry("ReceiveOrder");
     buildIdentityField("orderId");
     buildCancellationItem("CancelOrder");
+    // Other-bugs #2: a returned parcel ends the order and gives its reserved stock back.
+    buildCancellationItem("ReturnToWarehouse");
     buildEndOutcome("CancelOrder", "cancelled");
     buildEndOutcome("ReturnToWarehouse", "returned");
     buildEndOutcome("CloseOrder", "succeeded");
