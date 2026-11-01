@@ -32,12 +32,30 @@ void DataBasedRouting::setDefaultBranch(const std::string& decisionItem,
     decisions[decisionItem].defaultTargets = targets;
 }
 
+void DataBasedRouting::setRejectionPath(const std::string& item, const std::vector<std::string>& targets) {
+    requireTargets(item, targets);
+    rejectionPaths[item] = targets;
+}
+
+bool DataBasedRouting::hasRejectionPath(const std::string& item) const {
+    return rejectionPaths.find(item) != rejectionPaths.end();
+}
+
 bool DataBasedRouting::hasDecision(const std::string& item) const {
     return decisions.find(item) != decisions.end();
 }
 
 RoutingDecision DataBasedRouting::determineNextWork(const std::string& completedItem,
                                                     const DataPayload& instanceData) const {
+    std::map<std::string, std::vector<std::string> >::const_iterator onReject = rejectionPaths.find(completedItem);
+    if (onReject != rejectionPaths.end() && RoutingCondition::rejected(completedItem).evaluate(instanceData)) {
+        RoutingDecision decision;
+        decision.completedItem = completedItem;
+        decision.nextItems = onReject->second;
+        decision.description = "Rejected: " + completedItem + " -> " + joinNames(decision.nextItems);
+        return decision;
+    }
+
     std::map<std::string, DecisionPoint>::const_iterator point = decisions.find(completedItem);
     if (point == decisions.end()) {
         return followPath(completedItem);

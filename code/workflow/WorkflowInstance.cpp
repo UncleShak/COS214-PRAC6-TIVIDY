@@ -12,6 +12,7 @@
 #include "InstanceSnapshot.h"
 #include "InterruptListener.h"
 #include "KeyValuePayload.h"
+#include "RoutingCondition.h"
 #include "Stage.h"
 #include "StateFactory.h"
 #include "WorkItem.h"
@@ -196,6 +197,12 @@ void WorkflowInstance::setField(const std::string& key, const std::string& value
     if (fields != nullptr) fields->set(key, value);
 }
 
+// Bug 1: routing only sees the instance data, so how an item finished must be in it.
+// Written after the command succeeds and before routing; the payload is in the undo snapshot.
+void WorkflowInstance::recordOutcome(const std::string& item, const std::string& outcome) {
+    setField(RoutingCondition::outcomeField(item), outcome);
+}
+
 void WorkflowInstance::assignWork(const std::string& name, Participant* actor, Participant* assignee) {
     requireStarted();
     beginAction();
@@ -238,6 +245,7 @@ void WorkflowInstance::completeWork(const std::string& name, Participant* actor)
         history.record("Connector: '" + name + "' called " + binding->operation);
     }
     runCommand(new CompleteCommand(item, actor, target));
+    recordOutcome(name, "completed");
     apply(tracker->complete(name, *payload));
 }
 
@@ -246,6 +254,7 @@ void WorkflowInstance::rejectWork(const std::string& name, Participant* actor, c
     beginAction();
     WorkItem* item = getItem(name);
     runCommand(new RejectCommand(item, actor, reason, guard(item, actor)));
+    recordOutcome(name, "rejected");
     apply(tracker->reject(name, *payload));
 }
 
@@ -298,6 +307,7 @@ void WorkflowInstance::finishApproved(const std::string& name) {
     WorkItem* item = getItem(name);
     setField(definition->getApprovalRule(name)->resultField, "yes");
     runCommand(new CompleteCommand(item, item->getAssignedParticipant(), workOf(item)));
+    recordOutcome(name, "completed");
     apply(tracker->complete(name, *payload));
 }
 
@@ -305,6 +315,7 @@ void WorkflowInstance::finishRejected(const std::string& name, Participant* deci
     WorkItem* item = getItem(name);
     setField(definition->getApprovalRule(name)->resultField, "no");
     runCommand(new RejectCommand(item, decider, reason));
+    recordOutcome(name, "rejected");
     apply(tracker->reject(name, *payload));
 }
 
