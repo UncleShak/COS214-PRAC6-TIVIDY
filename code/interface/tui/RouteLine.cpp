@@ -22,7 +22,6 @@ const char* const kDone = "●";
 const char* const kCurrent = "◉";
 const char* const kStop = "○";
 const char* const kThick = "━";
-const char* const kThin = "─";
 const char* const kDrop = "╲";
 
 bool reached(const Station& s) {
@@ -105,17 +104,19 @@ void drawBranch(WINDOW* w, const RouteModel& route, int splitColumn, int branchF
     }
     const int fill = !taken ? 0 : (branchFill < 0 ? travelled : branchFill);
 
-    putGlyphs(w, 4, splitColumn + 1, kDrop, Tone::Red);
-    putGlyphs(w, 5, splitColumn + 2, kDrop, Tone::Red);
+    // Drawn like the main line: dim track and hollow stops until the train travels it, then red.
+    putGlyphs(w, 4, splitColumn + 1, kDrop, 0 < fill ? Tone::Red : Tone::Dim);
+    putGlyphs(w, 5, splitColumn + 2, kDrop, 1 < fill ? Tone::Red : Tone::Dim);
     for (int x = g.trackStart; x <= g.trackEnd; ++x) {
-        putGlyphs(w, kBranchRow, x, g.cellOf(x) < fill ? kThick : kThin, Tone::Red);
+        putGlyphs(w, kBranchRow, x, kThick, g.cellOf(x) < fill ? Tone::Red : Tone::Dim);
     }
     for (int j = 0; j < count; ++j) {
         const Station& s = route.branch[j];
         const int x = g.stationX(j);
         const bool lit = reached(s) && g.cellOf(x) < fill;
         const char* glyph = !lit ? kStop : (s.kind == Station::Kind::Current ? kCurrent : kDone);
-        putGlyphs(w, kBranchRow, x, glyph, s.kind == Station::Kind::Skipped ? Tone::Dim : Tone::Red);
+        const Tone tone = lit ? Tone::Red : (s.kind == Station::Kind::Skipped ? Tone::Dim : Tone::Muted);
+        putGlyphs(w, kBranchRow, x, glyph, tone);
         putLabel(w, kBranchLabelRow, x, s.label, j == route.branchCurrent ? Tone::Bright : Tone::Muted);
     }
     // While animating, the train itself: a red ◉ at the head of the fill, down the drops and
