@@ -13,6 +13,7 @@
 #include "InterruptListener.h"
 #include "KeyValuePayload.h"
 #include "RoutingCondition.h"
+#include "RoutingCondition.h"
 #include "Stage.h"
 #include "StateFactory.h"
 #include "WorkItem.h"
@@ -315,6 +316,7 @@ void WorkflowInstance::finishRejected(const std::string& name, Participant* deci
     WorkItem* item = getItem(name);
     setField(definition->getApprovalRule(name)->resultField, "no");
     runCommand(new RejectCommand(item, decider, reason));
+    recordOutcome(name, "rejected");
         recordOutcome(name, "rejected");
     apply(tracker->reject(name, *payload));
 }

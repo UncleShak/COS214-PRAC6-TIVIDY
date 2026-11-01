@@ -37,6 +37,11 @@ void DuneHarvestBuilder::buildRules() {
                                       "DeployCarryall", "Harvest"};
     for (const char* item : rejectable) buildRejectionPath(item, {"AbandonRun"});
 
+    // A rejected step abandons the run (Bug 1); see ArkhamExpressBuilder.
+    const char* const rejectable[] = {"SurveyField", "ApproveHarvestPermit", "DeployHarvester",
+                                      "DeployCarryall", "Harvest"};
+    for (const char* item : rejectable) buildRejectionPath(item, {"AbandonRun"});
+
     buildDependency("ApproveHarvestPermit", "SurveyField");
     buildDependency("Harvest", "DeployHarvester");   // the harvester waits for both machines
     buildDependency("Harvest", "DeployCarryall");

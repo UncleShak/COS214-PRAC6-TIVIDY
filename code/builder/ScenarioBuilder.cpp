@@ -10,7 +10,7 @@ ScenarioBuilder::ScenarioBuilder(const std::string& n, const std::string& v)
 }
 void ScenarioBuilder::reset() {
     product.reset(new WorkflowDefinition(new Stage(name), version));
-    stages.clear(); items.clear(); edges.clear(); defaults.clear();
+    stages.clear(); items.clear(); edges.clear(); rejectionEdges.clear(); defaults.clear();
     stages[name] = static_cast<Stage*>(product->getRootStage());
     product->routingRule.reset(new DataBasedRouting());
     routing = static_cast<DataBasedRouting*>(product->routingRule.get());
@@ -78,6 +78,11 @@ void ScenarioBuilder::buildDefaultBranch(const std::string& from, const std::vec
     if (edges.count(from) && !routing->hasDecision(from)) throw std::invalid_argument("Item already has fixed paths");
     if (defaults.count(from)) throw std::invalid_argument("Decision already has a default branch");
     routing->setDefaultBranch(from, targets); recordEdges(from, targets); defaults.insert(from);
+}
+void ScenarioBuilder::buildRejectionPath(const std::string& from, const std::vector<std::string>& targets) {
+    checkTargets(from, targets);
+    if (routing->hasRejectionPath(from)) throw std::invalid_argument("'" + from + "' already has a rejection path");
+    routing->setRejectionPath(from, targets); rejectionEdges[from] = targets;
 }
 void ScenarioBuilder::buildAssignmentRule(std::unique_ptr<AssignmentRule> rule) {
     requireProduct();
@@ -148,8 +153,10 @@ std::unique_ptr<WorkflowDefinition> ScenarioBuilder::getResult() {
         if (!visited.insert(item).second) continue;
         const auto found = edges.find(item);
         if (found != edges.end()) pending.insert(pending.end(), found->second.begin(), found->second.end());
+        const auto onReject = rejectionEdges.find(item);
+        if (onReject != rejectionEdges.end()) pending.insert(pending.end(), onReject->second.begin(), onReject->second.end());
     }
     if (visited.size() != items.size()) throw std::logic_error("Definition contains unreachable work");
-    stages.clear(); items.clear(); edges.clear(); defaults.clear(); routing = nullptr;
+    stages.clear(); items.clear(); edges.clear(); rejectionEdges.clear(); defaults.clear(); routing = nullptr;
     return std::move(product);
 }
