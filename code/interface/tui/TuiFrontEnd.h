@@ -76,6 +76,21 @@ private:
     void newInstance();
     void chooseActor();
     void actionMenu();
+    /**
+     * @brief An action key (S C R E A X) on the dashboard. Reject and Cancel only arm a
+     *        confirmation; the same key again performs them. Refused with "only <Role> can ..."
+     *        when the actor lacks the item's role.
+     */
+    void actionKey(int key);
+    /** @brief Second key after an armed confirmation: the same key performs, any other cancels. */
+    void confirmKey(int key);
+    /**
+     * @brief Asks what the action needs (assignee, reason), sends it and shows the result.
+     * @param confirmed Cancel was already confirmed (by the double key press)
+     */
+    void performAction(WorkAction action, const WorkItemView& item, bool confirmed);
+    /** @brief The role @p action needs from the actor on @p item, if the actor lacks it; "" if allowed. */
+    std::string missingRole(WorkAction action, const WorkItemView& item) const;
     void approvalsMenu();
     void advanceClock();
     void raiseEvent();
@@ -172,6 +187,11 @@ private:
     std::vector<std::string> overdue_;
 
     bool running_;
+
+    bool pending_;            ///< a Reject or Cancel waits for its confirming key
+    int pendingKey_;
+    WorkAction pendingAction_;
+    std::string pendingItem_;
 
     mutable std::map<std::string, std::vector<RouteStop> > routeMaps_;
 };

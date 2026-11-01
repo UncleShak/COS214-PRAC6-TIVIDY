@@ -1,6 +1,7 @@
 #include "TuiFrontEnd.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 
 #include "InputValidation.h"
@@ -107,7 +108,8 @@ TuiFrontEnd::TuiFrontEnd(InterfaceController& controller, const std::string& eng
     : controller_(controller), interpreter_(controller), engineLabel_(engineLabel),
       status_(controller.status()), screen_(Screen::Industries), focus_(Pane::List), selected_(0),
       listTop_(0), detailTop_(0), bodyTop_(0), availableOnly_(false), showPanel_(false),
-      newestFirst_(false), reportTab_(0), running_(true) {
+      newestFirst_(false), reportTab_(0), running_(true), pending_(false), pendingKey_(0),
+      pendingAction_(WorkAction::Assign) {
     enter(Screen::Industries);
 }
 
@@ -115,6 +117,9 @@ void TuiFrontEnd::run() {
     draw();
     while (running_) {
         const int key = getch();
+        if (!pending_ && key != KEY_RESIZE) {
+            status_ = StatusMessage::none();   // an announcement lasts until the next key
+        }
         if (key == KEY_RESIZE) {
             Log::write("resize");
             layout_.rebuild();
@@ -122,6 +127,8 @@ void TuiFrontEnd::run() {
             if (key == 'q' || key == 'Q') {
                 running_ = false;
             }
+        } else if (pending_) {
+            confirmKey(key);
         } else if (!handleGlobal(key)) {
             switch (screen_) {
             case Screen::Industries: handleIndustries(key); break;
@@ -238,6 +245,8 @@ void TuiFrontEnd::handleDashboard(int key) {
         selected_ = 0;
         reselect(id);
         status_ = StatusMessage::info(availableOnly_ ? "Showing available work only" : "Showing all work items");
+    } else if (key == 'S' || key == 'C' || key == 'R' || key == 'E' || key == 'A' || key == 'X') {
+        actionKey(key);
     } else if (key == 'a') {
         approvalsMenu();
     } else if (key == 'h') {
@@ -502,8 +511,66 @@ void TuiFrontEnd::actionMenu() {
     if (pick == Dialog::kCancelled) {
         return;
     }
-    const WorkAction action = kActions[pick];
+    performAction(kActions[pick], item, false);
+}
 
+std::string TuiFrontEnd::missingRole(WorkAction action, const WorkItemView& item) const {
+    if (item.requiredRole.empty() ||
+        (action != WorkAction::Start && action != WorkAction::Complete && action != WorkAction::Reject)) {
+        return "";
+    }
+    const SessionView& view = controller_.view();
+    for (std::size_t i = 0; i < view.participants.size(); ++i) {
+        if (view.participants[i].id == view.actorId) {
+            return hasRole(view.participants[i], item.requiredRole) ? "" : item.requiredRole;
+        }
+    }
+    return "";
+}
+
+void TuiFrontEnd::actionKey(int key) {
+    const WorkItemView* selected = selectedItem();
+    if (selected == 0) {
+        status_ = StatusMessage::invalidInput("no work item is selected");
+        return;
+    }
+    WorkAction action = WorkAction::Assign;
+    for (int i = 0; i < kActionBulletCount; ++i) {
+        if (kActionBullets[i].key[0] == key) {
+            action = kActionBullets[i].action;
+        }
+    }
+    std::string verb = actionName(action);
+    for (std::size_t i = 0; i < verb.size(); ++i) {
+        verb[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(verb[i])));
+    }
+    const std::string role = missingRole(action, *selected);
+    if (!role.empty()) {
+        status_ = StatusMessage::engineError("only " + role + " can " + verb + ".");
+        return;
+    }
+    if (action == WorkAction::Reject || action == WorkAction::Cancel) {
+        pending_ = true;
+        pendingKey_ = key;
+        pendingAction_ = action;
+        pendingItem_ = selected->id;
+        return;
+    }
+    performAction(action, *selected, false);
+}
+
+void TuiFrontEnd::confirmKey(int key) {
+    pending_ = false;
+    const WorkItemView* item = findItem(pendingItem_);
+    if (key != pendingKey_ || item == 0) {
+        status_ = StatusMessage::info(std::string(actionName(pendingAction_)) + " not confirmed, nothing changed");
+        return;
+    }
+    const WorkItemView copy = *item;
+    performAction(pendingAction_, copy, true);
+}
+
+void TuiFrontEnd::performAction(WorkAction action, const WorkItemView& item, bool confirmed) {
     std::string assignee;
     std::string reason;
     if (action == WorkAction::Assign) {
@@ -527,7 +594,7 @@ void TuiFrontEnd::actionMenu() {
             status_ = StatusMessage::info("Reject cancelled, nothing changed");
             return;
         }
-    } else if (action == WorkAction::Cancel) {
+    } else if (action == WorkAction::Cancel && !confirmed) {
         draw();
         if (!Dialog::confirm("Cancel '" + item.name + "'? (u undoes it)")) {
             status_ = StatusMessage::info("Cancel not confirmed, nothing changed");
@@ -734,6 +801,8 @@ void TuiFrontEnd::showHelp() {
     case Screen::Dashboard:
         lines.push_back(Line("Instance dashboard", Tone::Line));
         lines.push_back(Line("  Enter            actions on the selected work item"));
+        lines.push_back(Line("  S C R E A X      start, complete, reject, escalate, assign, cancel"));
+        lines.push_back(Line("                   (R and X ask you to press the key again to confirm)"));
         lines.push_back(Line("                   (muted actions would be refused; you can still try them)"));
         lines.push_back(Line("  v                all work items / available work only"));
         lines.push_back(Line("  a                approval requests (approve or reject)"));
@@ -1083,8 +1152,9 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
         if (std::find(hinted.begin(), hinted.end(), kActionBullets[i].action) == hinted.end()) {
             continue;
         }
-        row.add(bullet(kActionBullets[i].key), kActionBullets[i].tone);
-        row.add(" " + fit(actionName(kActionBullets[i].action), 11), Tone::Text);
+        const bool barred = !missingRole(kActionBullets[i].action, *item).empty();
+        row.add(bullet(kActionBullets[i].key), barred ? Tone::Dim : kActionBullets[i].tone);
+        row.add(" " + fit(actionName(kActionBullets[i].action), 11), barred ? Tone::Dim : Tone::Text);
         if (++inRow == 2) {
             lines.push_back(row);
             row = Line();
@@ -1449,24 +1519,44 @@ void TuiFrontEnd::drawMenu() {
 }
 
 void TuiFrontEnd::drawAnnounce() {
+    const SessionView& view = controller_.view();
     WINDOW* w = layout_.announce();
     werase(w);
     fillRow(w, 0, 0, COLS, Tone::Band);
-    std::string text = "Choose a line to see its trains.";
-    Tone tone = Tone::Band;
-    if (status_.kind == StatusMessage::Kind::Error) {
-        text = status_.text;
-        tone = Tone::BandRed;
+    Line line;
+    bool alarm = false;
+    if (pending_) {
+        const WorkItemView* item = findItem(pendingItem_);
+        line.add(std::string(actionName(pendingAction_)) + " ", Tone::Band)
+            .add(item != 0 ? item->name : pendingItem_, Tone::BandBright)
+            .add("? Press " + std::string(1, static_cast<char>(pendingKey_)) + " again to confirm.", Tone::Band);
+    } else if (status_.isError()) {
+        alarm = true;
+        line.add("Stand clear:", Tone::BandRed).add(" " + status_.text, Tone::Band);
     } else if (!status_.text.empty()) {
-        text = status_.text;
-    } else if (!controller_.view().instanceId.empty()) {
-        std::vector<std::string> lines;
-        controller_.history(lines, true, "");
-        text = lines.empty() ? "No events yet." : lines.front();
+        line.add(status_.text, Tone::Band);
+    } else if (view.industryId.empty()) {
+        line.add("Choose a line to see its trains.", Tone::Band);
+    } else if (view.instanceId.empty()) {
+        line.add("Choose a train, or press n to start one.", Tone::Band);
+    } else {
+        const RouteModel route = currentRoute();
+        const Station* now = route.lastReached();
+        const Station* next = route.nextStation();
+        if (now == 0) {
+            line.add("This train has not left yet.", Tone::Band);
+        } else {
+            line.add("This is ", Tone::Band).add(now->name, Tone::BandBright);
+            if (next != 0) {
+                line.add(". Next stop is ", Tone::Band).add(next->name, Tone::BandBright).add(".", Tone::Band);
+            } else {
+                line.add(". Last stop.", Tone::Band);
+            }
+        }
     }
-    putGlyphs(w, 0, 1, "\u25B6", tone == Tone::BandRed ? Tone::BandRed : Tone::BandBright);
-    const std::string clock = "t=" + number(controller_.view().clock);
-    putText(w, 0, 3, text, tone, static_cast<int>(clock.size()) + 3);
+    putGlyphs(w, 0, 1, "\u25B6", alarm ? Tone::BandRed : Tone::BandBright);
+    const std::string clock = "t=" + number(view.clock);
+    putLine(w, 0, 3, COLS - 6 - static_cast<int>(clock.size()), line, false);
     putText(w, 0, COLS - 1 - static_cast<int>(clock.size()), clock, Tone::BandMuted, 0);
     touchwin(w);
     wnoutrefresh(w);
