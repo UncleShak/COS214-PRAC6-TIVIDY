@@ -47,6 +47,10 @@ void ArkhamExpressBuilder::buildRules() {
     const char* const rejectable[] = {"ReceiveOrder", "ValidateOrder", "CheckStock", "PreparePackage",
                                       "SelectDeliveryType", "AssignDriver", "Dispatch", "Deliver"};
     for (const char* item : rejectable) buildRejectionPath(item, {"CancelOrder"});
+    // How an order ended (other-bugs #17). Cancellation first: it outranks the others.
+    buildEndOutcome("CancelOrder", "cancelled");
+    buildEndOutcome("CloseOrder", "succeeded");
+    buildEndOutcome("ReturnToWarehouse", "returned");
     buildDependency("ValidateOrder", "ReceiveOrder");
     buildDependency("CheckStock", "ValidateOrder");
     buildDependency("RequestStock", "CheckStock");

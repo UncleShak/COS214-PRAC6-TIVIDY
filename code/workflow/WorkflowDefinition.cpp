@@ -30,6 +30,10 @@ const WorkflowDefinition::DecorationRule* WorkflowDefinition::getDecoration(cons
     return found == decorations.end() ? nullptr : &found->second;
 }
 
+const std::vector<WorkflowDefinition::EndOutcome>& WorkflowDefinition::getEndOutcomes() const {
+    return endOutcomes;
+}
+
 const WorkflowDefinition::ApprovalRule* WorkflowDefinition::getApprovalRule(const std::string& itemName) const {
     std::map<std::string, ApprovalRule>::const_iterator found = approvals.find(itemName);
     return found == approvals.end() ? nullptr : &found->second;

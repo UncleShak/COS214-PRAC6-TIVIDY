@@ -114,6 +114,16 @@ void WorkflowInstance::requireStarted() const {
     if (!started) throw std::logic_error("Instance " + instanceId + " has not started");
 }
 
+std::string WorkflowInstance::getOutcome() const {
+    if (!tracker->isStarted()) return "not started";
+    if (tracker->isStalled()) return "stalled";
+    if (!tracker->isComplete()) return "running";
+    const std::vector<WorkflowDefinition::EndOutcome>& ends = definition->getEndOutcomes();
+    for (std::size_t i = 0; i < ends.size(); ++i)
+        if (tracker->isCompleted(ends[i].item)) return ends[i].outcome;
+    return "stopped";
+}
+
 bool WorkflowInstance::hasItem(const std::string& name) const { return items.count(name) > 0; }
 
 WorkItem* WorkflowInstance::getItem(const std::string& name) const {
@@ -155,7 +165,7 @@ void WorkflowInstance::apply(const ProgressionResult& result) {
     for (std::size_t i = 0; i < result.madeAvailable.size(); ++i) open(result.madeAvailable[i]);
     if (!result.decision.description.empty()) history.record("Routing: " + result.decision.description);
     recordDropped(result);
-    if (result.instanceComplete) history.record("Instance " + instanceId + " complete");
+    if (result.instanceComplete) history.record("Instance " + instanceId + " complete: " + getOutcome());
     lastProgression = result;
     routedLast = true;
 }
@@ -272,7 +282,7 @@ void WorkflowInstance::cancelWork(const std::string& name, Participant* actor) {
     WorkItem* item = getItem(name);
     runCommand(new CancelCommand(item, actor, guard(item, actor)));
     recordDropped(tracker->cancel(name));
-    if (tracker->isComplete()) history.record("Instance " + instanceId + " complete");
+    if (tracker->isComplete()) history.record("Instance " + instanceId + " complete: " + getOutcome());
 }
 
 void WorkflowInstance::escalateWork(const std::string& name, Participant* actor) {

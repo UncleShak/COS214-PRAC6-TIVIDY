@@ -28,6 +28,9 @@ protected:
     void buildDefaultBranch(const std::string& from, const std::vector<std::string>& targets);
     /// Where `from` goes when it is rejected. Overrides its normal path or branches, in any order.
     void buildRejectionPath(const std::string& from, const std::vector<std::string>& targets);
+    /// Completing `item` ends the run with `outcome` (e.g. "succeeded", "cancelled"). Tag in
+    /// priority order: if several tagged items complete, the first tagged wins.
+    void buildEndOutcome(const std::string& item, const std::string& outcome);
     void buildAssignmentRule(std::unique_ptr<AssignmentRule> rule);
     void buildConnector(const std::string& item, std::shared_ptr<Connector>, const std::string& operation);
     // An event type that cancels `cancel` and opens `open` (items reachable only this way count as reachable).
