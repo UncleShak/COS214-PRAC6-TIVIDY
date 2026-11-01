@@ -100,6 +100,8 @@ private:
     std::vector<Line> detailLines() const;
     std::vector<Line> bodyLines() const;
     std::string listTitle() const;
+    /** @brief Right side of the list's top edge, e.g. "3 of 13 done". */
+    std::string listSummary() const;
     std::string emptyListText() const;
     /** @brief Header breadcrumbs after TIVIDY: industry, instance, screen. */
     std::vector<std::string> breadcrumbs() const;

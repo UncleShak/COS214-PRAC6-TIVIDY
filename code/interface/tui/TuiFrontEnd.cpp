@@ -70,6 +70,24 @@ bool isFinal(const std::string& state) {
     return state == "Completed" || state == "Rejected" || state == "Cancelled";
 }
 
+/** The station glyph of a work item: ● done, ◉ current, ○ upcoming. */
+Span station(const WorkItemView& item) {
+    const std::string& state = item.state;
+    if (state == "Completed") return Span("\u25CF", Tone::Bright);
+    if (state == "Rejected")  return Span("\u25CF", Tone::Red);
+    if (state == "Cancelled") return Span("\u25CF", Tone::Dim);
+    if (item.trackerStatus == "waiting" || state == "Created") return Span("\u25CB", Tone::Muted);
+    return Span("\u25C9", Tone::Line);
+}
+
+/** The state word as shown at the right of a row: escalation as a yellow block. */
+Span stateLabel(const WorkItemView& item) {
+    const bool waiting = item.trackerStatus == "waiting";
+    const std::string text = waiting ? std::string("Waiting") : item.state;
+    const Tone tone = Theme::forState(item.state, item.trackerStatus);
+    return Span(tone == Tone::Escalated ? " " + text + " " : text, tone);
+}
+
 bool hasRole(const ParticipantView& person, const std::string& role) {
     return std::find(person.roles.begin(), person.roles.end(), role) != person.roles.end();
 }
@@ -895,12 +913,14 @@ std::vector<Line> TuiFrontEnd::listRows(int width) const {
         }
     } else if (screen_ == Screen::Dashboard) {
         const std::vector<WorkItemView>& work = items();
-        const std::size_t nameWidth = static_cast<std::size_t>(std::max(8, width - 14));
         for (std::size_t i = 0; i < work.size(); ++i) {
             const WorkItemView& item = work[i];
-            const bool waiting = item.trackerStatus == "waiting";
-            rows.push_back(Line(fit(item.name, nameWidth) + " " + (waiting ? std::string("Waiting") : item.state),
-                                Theme::forState(item.state, item.trackerStatus)));
+            const Span glyph = station(item);
+            const Span state = stateLabel(item);
+            Line row;
+            row.add(" ", Tone::Text).add(glyph.text, glyph.tone).add("  " + item.name, Tone::Text);
+            row.addRight(state.text, state.tone).addRight(" ", Tone::Text);
+            rows.push_back(row);
         }
     }
     return rows;
@@ -1102,6 +1122,13 @@ std::string TuiFrontEnd::listTitle() const {
     case Screen::Instances:  return "INSTANCES";
     default:                 break;
     }
+    return availableOnly_ ? "AVAILABLE WORK" : "WORK ITEMS";
+}
+
+std::string TuiFrontEnd::listSummary() const {
+    if (screen_ != Screen::Dashboard) {
+        return "";
+    }
     const SessionView& view = controller_.view();
     int done = 0;
     for (std::size_t i = 0; i < view.workItems.size(); ++i) {
@@ -1109,10 +1136,7 @@ std::string TuiFrontEnd::listTitle() const {
             ++done;
         }
     }
-    const int total = static_cast<int>(view.workItems.size());
-    return std::string(availableOnly_ ? "AVAILABLE WORK" : "WORK ITEMS") + "  " + number(done) + "/" +
-           number(total) + " done (" + number(total == 0 ? 0 : done * 100 / total) + "%), " +
-           instanceStatus(view.instance);
+    return number(done) + " of " + number(static_cast<int>(view.workItems.size())) + " done";
 }
 
 std::string TuiFrontEnd::emptyListText() const {
@@ -1383,7 +1407,7 @@ void TuiFrontEnd::drawPanes() {
     // list
     WINDOW* list = listWindow();
     werase(list);
-    drawFrame(list, listTitle(), focus_ == Pane::List);
+    drawFrame(list, listTitle(), focus_ == Pane::List, listSummary());
     const int width = getmaxx(list) - 4;
     const std::vector<Line> rows = listRows(width);
     const int count = static_cast<int>(rows.size());
@@ -1412,11 +1436,10 @@ void TuiFrontEnd::drawPanes() {
             putLine(list, 1 + row, 2, width, rows[index], chosen);
         }
     }
-    if (listTop_ > 0) {
-        putText(list, 0, getmaxx(list) - 10, " more ^ ", Tone::Muted, 1);
-    }
-    if (listTop_ + visible < count) {
-        putText(list, getmaxy(list) - 1, getmaxx(list) - 10, " more v ", Tone::Muted, 1);
+    if (listTop_ > 0 || listTop_ + visible < count) {
+        const std::string more = listTop_ > 0 && listTop_ + visible < count ? " more \u2191\u2193 "
+                                 : (listTop_ > 0 ? " more \u2191 " : " more \u2193 ");
+        putText(list, getmaxy(list) - 1, getmaxx(list) - 3 - static_cast<int>(cells(more)), more, Tone::Muted, 1);
     }
     touchwin(list);
     wnoutrefresh(list);
