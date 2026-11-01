@@ -54,6 +54,14 @@ RoutingCondition RoutingCondition::equals(const std::string& field, const std::s
         });
 }
 
+std::string RoutingCondition::outcomeField(const std::string& item) {
+    return item + ".outcome";
+}
+
+RoutingCondition RoutingCondition::rejected(const std::string& item) {
+    return RoutingCondition("[" + item + " rejected]", equals(outcomeField(item), "rejected").predicate);
+}
+
 RoutingCondition RoutingCondition::notEquals(const std::string& field, const std::string& value) {
     return RoutingCondition("[" + field + " != " + value + "]",
         [field, value](const DataPayload& data) {

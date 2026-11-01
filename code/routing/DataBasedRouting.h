@@ -15,6 +15,7 @@
  * Each decision point is an ordered list of guarded branches and an optional
  * default. The first branch whose RoutingCondition holds wins. Items without a
  * decision point follow the fixed path inherited from SequentialRouting.
+ * A rejection path, when an item has one, overrides both once that item was rejected.
  */
 class DataBasedRouting : public SequentialRouting {
 public:
@@ -26,6 +27,14 @@ public:
                    const std::vector<std::string>& targets);
     void setDefaultBranch(const std::string& decisionItem, const std::vector<std::string>& targets);
     bool hasDecision(const std::string& item) const;
+
+    /**
+     * Where `item` goes when it was rejected (its RoutingCondition::outcomeField is "rejected").
+     * Checked before the item's fixed path or decision point, because those read data a
+     * rejection never changed. Items without one route the same way after a rejection.
+     */
+    void setRejectionPath(const std::string& item, const std::vector<std::string>& targets);
+    bool hasRejectionPath(const std::string& item) const;
 
     RoutingDecision determineNextWork(const std::string& completedItem,
                                       const DataPayload& instanceData) const override;
@@ -43,6 +52,7 @@ private:
     };
 
     std::map<std::string, DecisionPoint> decisions;
+    std::map<std::string, std::vector<std::string> > rejectionPaths;
 };
 
 #endif

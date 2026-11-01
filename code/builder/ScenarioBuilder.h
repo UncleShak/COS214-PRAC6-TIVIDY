@@ -26,6 +26,8 @@ protected:
     void buildPath(const std::string& from, const std::string& to);
     void buildBranch(const std::string& from, const RoutingCondition&, const std::vector<std::string>& targets);
     void buildDefaultBranch(const std::string& from, const std::vector<std::string>& targets);
+    /// Where `from` goes when it is rejected. Overrides its normal path or branches, in any order.
+    void buildRejectionPath(const std::string& from, const std::vector<std::string>& targets);
     void buildAssignmentRule(std::unique_ptr<AssignmentRule> rule);
     void buildConnector(const std::string& item, std::shared_ptr<Connector>, const std::string& operation);
     // An event type that cancels `cancel` and opens `open` (items reachable only this way count as reachable).
@@ -54,5 +56,6 @@ private:
     std::set<std::string> items;
     std::set<std::string> defaults;
     std::map<std::string, std::set<std::string>> edges;
+    std::map<std::string, std::vector<std::string>> rejectionEdges;   // kept apart: not a fixed path
 };
 #endif
