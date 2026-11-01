@@ -7,20 +7,20 @@
 #include <stdexcept>
 
 // --- Illegal Transitions ---
-void AssignedState::makeAvailable(WorkItem* context) {
+void AssignedState::makeAvailable(WorkItem* /*context*/) {
     // Assuming standard forward-only progression for now.
     throw std::logic_error("Cannot make an Assigned item Available again.");
 }
 
-void AssignedState::assign(WorkItem* context) {
+void AssignedState::assign(WorkItem* /*context*/) {
     throw std::logic_error("Item is already Assigned.");
 }
 
-void AssignedState::complete(WorkItem* context) {
+void AssignedState::complete(WorkItem* /*context*/) {
     throw std::logic_error("Cannot complete an item before it is Started.");
 }
 
-void AssignedState::reject(WorkItem* context) {
+void AssignedState::reject(WorkItem* /*context*/) {
     throw std::logic_error("Cannot reject an item before it is Started.");
 }
 

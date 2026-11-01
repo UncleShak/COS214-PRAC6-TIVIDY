@@ -16,22 +16,22 @@ void EscalatedState::cancel(WorkItem* context) {
 }
 
 // --- Illegal Transitions ---
-void EscalatedState::makeAvailable(WorkItem* context) {
+void EscalatedState::makeAvailable(WorkItem* /*context*/) {
     throw std::logic_error("Escalated items must be directly assigned, not made generally available.");
 }
 
-void EscalatedState::start(WorkItem* context) {
+void EscalatedState::start(WorkItem* /*context*/) {
     throw std::logic_error("Cannot start an Escalated item. It must be reassigned first.");
 }
 
-void EscalatedState::complete(WorkItem* context) {
+void EscalatedState::complete(WorkItem* /*context*/) {
     throw std::logic_error("Cannot complete an Escalated item.");
 }
 
-void EscalatedState::reject(WorkItem* context) {
+void EscalatedState::reject(WorkItem* /*context*/) {
     throw std::logic_error("Cannot reject an Escalated item.");
 }
 
-void EscalatedState::escalate(WorkItem* context) {
+void EscalatedState::escalate(WorkItem* /*context*/) {
     throw std::logic_error("Item is already Escalated.");
 }

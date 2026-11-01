@@ -193,7 +193,6 @@ Names duItems() {
                  "DeployCarryall", "Harvest", "TransportToRefinery", "Evacuate"};
 }
 
-bool has(const Names& v, const std::string& s) { for (std::size_t i = 0; i < v.size(); ++i) if (v[i] == s) return true; return false; }
 
 }  // namespace
 

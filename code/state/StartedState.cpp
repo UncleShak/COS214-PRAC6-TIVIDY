@@ -7,15 +7,15 @@
 #include <stdexcept>
 
 // --- Illegal Transitions ---
-void StartedState::makeAvailable(WorkItem* context) {
+void StartedState::makeAvailable(WorkItem* /*context*/) {
     throw std::logic_error("Cannot make a Started item Available.");
 }
 
-void StartedState::assign(WorkItem* context) {
+void StartedState::assign(WorkItem* /*context*/) {
     throw std::logic_error("Cannot assign an item that is already Started.");
 }
 
-void StartedState::start(WorkItem* context) {
+void StartedState::start(WorkItem* /*context*/) {
     throw std::logic_error("Item is already Started.");
 }
 
