@@ -377,10 +377,16 @@ std::vector<std::string> WorkflowInstance::onClockAdvanced() {
         std::map<std::string, std::unique_ptr<Decorated> >::const_iterator found = decorated.find(name);
         if (found == decorated.end() || found->second->deadline == nullptr || !found->second->deadline->isOverdue()) continue;
         WorkItem* item = getItem(name);
-        if (item->getCurrentState()->getStateName() != "Available") continue;
+        // Bug 4: overdue work that someone already holds (Assigned or Started) is escalated
+        // too. Before, only Available work was, so a late Started step could never finish.
+        const std::string state = item->getCurrentState()->getStateName();
+        if (state != "Available" && state != "Assigned" && state != "Started") continue;
+        if (needsApproval(name) && state == "Started") continue;   // the approval chain owns its deadline
+        Participant* holder = state == "Available" ? nullptr : item->getAssignedParticipant();
         runCommand(new EscalateCommand(item, &system));
         decorate(name);   // escalated work gets a fresh deadline
-        changes.push_back(instanceId + ": '" + name + "' is overdue and was escalated");
+        changes.push_back(instanceId + ": '" + name + "' is overdue and was escalated" +
+                          (holder ? " (taken from " + holder->getName() + ")" : ""));
     }
     return changes;
 }

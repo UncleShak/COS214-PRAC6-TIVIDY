@@ -9,7 +9,7 @@
  * | CompleteCommand | request() on the target, which completes   | Started -> Completed                 |
  * | RejectCommand   | reject()                                   | Started -> Rejected                  |
  * | CancelCommand   | cancel()                                   | Available, Assigned, Started, Escalated -> Cancelled |
- * | EscalateCommand | escalate()                                 | Available -> Escalated               |
+ * | EscalateCommand | escalate()                                 | Available, Assigned, Started -> Escalated |
  *
  * Proxy: every command first calls target->authorize("<action>"). When the target is an
  * AccessControlProxy around the item, the AccessPolicy can refuse (AccessDenied) before the
@@ -91,10 +91,12 @@ public:
 };
 
 /**
- * @brief Moves available work nobody has acted on to the escalation path.
+ * @brief Moves overdue work to the escalation path so it can be reassigned.
  *
- * Issued by the escalation chain (Chain of Responsibility), for example after it catches
- * DeadlineExceeded. An escalated item can then be assigned again with AssignCommand.
+ * Works on Available, Assigned and Started work. If someone was holding the work, it is
+ * taken off their workload. Issued by WorkflowInstance::onClockAdvanced when a
+ * DeadlineDecorator reports the work overdue. An escalated item is assigned again with
+ * AssignCommand and gets a fresh deadline.
  */
 class EscalateCommand : public Command {
 public:

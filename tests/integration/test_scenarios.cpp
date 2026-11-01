@@ -261,7 +261,7 @@ TEST_CASE("Chain of Responsibility: an unanswered permit escalates when the cloc
     CHECK(d.engine.getInstance("RUN-1")->getApprovals()[0]->getStatus() == PENDING);
 }
 
-TEST_CASE("Decorator: the evacuation deadline escalates late work and refuses a late finish") {
+TEST_CASE("Decorator: the evacuation deadline escalates late work, and escalates it again once started") {
     Dune d; d.run("RUN-1");
     d.throughPermit("RUN-1");
     d.engine.raiseEvent("RUN-1", "WORM_SIGN", "");
@@ -274,9 +274,85 @@ TEST_CASE("Decorator: the evacuation deadline escalates late work and refuses a 
 
     d.engine.assignWork("RUN-1", "Evacuate", "du-ops", "du-pilot");
     d.engine.startWork("RUN-1", "Evacuate", "du-pilot");
-    d.engine.advanceClock(5);
-    CHECK_THROWS_AS(d.engine.completeWorkItem("RUN-1", "Evacuate", "du-pilot"), DeadlineExceeded);
-    CHECK(d.state("RUN-1", "Evacuate") == "Started");
+    // Bug 4: late Started work is escalated too, instead of being stuck behind DeadlineExceeded.
+    CHECK(d.engine.advanceClock(5) ==
+          std::vector<std::string>{"RUN-1: 'Evacuate' is overdue and was escalated (taken from Tobin Reyes)"});
+    CHECK(d.state("RUN-1", "Evacuate") == "Escalated");
+}
+
+// ---- Bug 4: a started step that misses its deadline can still be finished ----
+
+TEST_CASE("Arkham: Deliver started, deadline passes") {
+    WorkflowEngine engine;
+    ArkhamExpressFactory factory;
+    engine.installIndustry(factory);
+    std::unique_ptr<DataPayload> order = factory.createInitialData("AX-7");
+    engine.startInstance("AX-7", "ArkhamExpress", order.get());
+    const char* const steps[][2] = {{"ReceiveOrder", "ax-clerk"}, {"ValidateOrder", "ax-clerk"},
+                                    {"CheckStock", "ax-wh"}, {"PreparePackage", "ax-wh"},
+                                    {"SelectDeliveryType", "ax-dm"}, {"AssignDriver", "ax-dm"},
+                                    {"Dispatch", "ax-drv"}};
+    for (const auto& step : steps) {
+        engine.assignWork("AX-7", step[0], "ax-dm", step[1]);
+        engine.startWork("AX-7", step[0], step[1]);
+        engine.completeWorkItem("AX-7", step[0], step[1]);
+    }
+    WorkflowInstance* instance = engine.getInstance("AX-7");
+    Participant* driver = engine.getParticipant("ax-drv");
+    engine.assignWork("AX-7", "Deliver", "ax-dm", "ax-drv");
+    engine.startWork("AX-7", "Deliver", "ax-drv");
+    CHECK(driver->getWorkload() == 1);
+
+    // The deadline is 10; go past it while Deliver is Started.
+    const std::vector<std::string> changes = engine.advanceClock(11);
+    CHECK(changes == std::vector<std::string>{"AX-7: 'Deliver' is overdue and was escalated (taken from Rook Calder)"});
+    CHECK(instance->getItem("Deliver")->getCurrentState()->getStateName() == "Escalated");
+    CHECK(driver->getWorkload() == 0);                                          // taken off the driver
+    CHECK(instance->getDueTime("Deliver") == engine.currentTime() + 10);        // fresh deadline
+
+    // Reassigned, it can now be finished, and the order closes normally.
+    engine.assignWork("AX-7", "Deliver", "ax-dm", "ax-drv");
+    engine.startWork("AX-7", "Deliver", "ax-drv");
+    CHECK_NOTHROW(engine.completeWorkItem("AX-7", "Deliver", "ax-drv"));
+    CHECK(instance->getItem("Deliver")->getCurrentState()->getStateName() == "Completed");
+    CHECK(driver->getWorkload() == 0);
+    engine.assignWork("AX-7", "CloseOrder", "ax-dm", "ax-clerk");
+    engine.startWork("AX-7", "CloseOrder", "ax-clerk");
+    engine.completeWorkItem("AX-7", "CloseOrder", "ax-clerk");
+    CHECK(instance->isComplete());
+}
+
+TEST_CASE("Dune: Evacuate started, deadline passes") {
+    Dune d; d.run("RUN-1");
+    d.throughPermit("RUN-1");
+    d.engine.raiseEvent("RUN-1", "WORM_SIGN", "");
+    d.engine.assignWork("RUN-1", "Evacuate", "du-ops", "du-pilot");
+    d.engine.startWork("RUN-1", "Evacuate", "du-pilot");
+
+    d.engine.advanceClock(4);   // deadline is 3
+    CHECK(d.state("RUN-1", "Evacuate") == "Escalated");
+    CHECK(d.engine.getParticipant("du-pilot")->getWorkload() == 0);
+
+    // Escalated work cannot be cancelled twice off the same person's workload.
+    d.engine.assignWork("RUN-1", "Evacuate", "du-ops", "du-pilot");
+    d.engine.startWork("RUN-1", "Evacuate", "du-pilot");
+    CHECK_NOTHROW(d.engine.completeWorkItem("RUN-1", "Evacuate", "du-pilot"));
+    CHECK(d.state("RUN-1", "Evacuate") == "Completed");
+    CHECK(d.engine.getParticipant("du-pilot")->getWorkload() == 0);
+}
+
+TEST_CASE("Bug 4: work assigned but not started is escalated when overdue, and an escalated step cancels cleanly") {
+    Dune d; d.run("RUN-1");
+    d.throughPermit("RUN-1");
+    d.engine.raiseEvent("RUN-1", "WORM_SIGN", "");
+    d.engine.assignWork("RUN-1", "Evacuate", "du-ops", "du-pilot");
+    CHECK(d.engine.getParticipant("du-pilot")->getWorkload() == 1);
+    d.engine.advanceClock(4);
+    CHECK(d.state("RUN-1", "Evacuate") == "Escalated");
+    CHECK(d.engine.getParticipant("du-pilot")->getWorkload() == 0);
+    d.engine.cancelWork("RUN-1", "Evacuate", "du-ops");
+    CHECK(d.state("RUN-1", "Evacuate") == "Cancelled");
+    CHECK(d.engine.getParticipant("du-pilot")->getWorkload() == 0);   // not taken off a second time
 }
 
 TEST_CASE("Decorator: the harvest is audited into the instance history") {

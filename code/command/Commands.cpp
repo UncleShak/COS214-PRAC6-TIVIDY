@@ -1,12 +1,20 @@
 #include "Commands.h"
 
 #include "../participants/Participant.h"
+#include "../state/WorkItemState.h"
 #include "../workflow/WorkItem.h"
 
 #include <stdexcept>
 
 namespace {
 std::string quoted(const WorkItem* item) { return "'" + item->getName() + "'"; }
+
+// True while the assignee is actually holding the work (it counts in their workload).
+// After an escalation the old assignee is still recorded but no longer holds it.
+bool assigneeHoldsWork(const WorkItem* item) {
+    const std::string state = item->getCurrentState()->getStateName();
+    return item->getAssignedParticipant() != nullptr && (state == "Assigned" || state == "Started");
+}
 }  // namespace
 
 AssignCommand::AssignCommand(WorkItem* i, Participant* a, Participant* assignee, WorkflowComponent* t)
@@ -72,8 +80,9 @@ CancelCommand::CancelCommand(WorkItem* i, Participant* a, WorkflowComponent* t) 
 
 void CancelCommand::execute() {
     target->authorize("cancel");
+    const bool held = assigneeHoldsWork(item);   // check before the state changes
     item->cancel();
-    if (item->getAssignedParticipant() != nullptr) {
+    if (held) {
         item->getAssignedParticipant()->workFinished();
     }
 }
@@ -86,7 +95,11 @@ EscalateCommand::EscalateCommand(WorkItem* i, Participant* a, WorkflowComponent*
 
 void EscalateCommand::execute() {
     target->authorize("escalate");
+    const bool held = assigneeHoldsWork(item);   // overdue Assigned or Started work (bug 4)
     item->escalate();
+    if (held) {
+        item->getAssignedParticipant()->workFinished();   // it is taken off them for reassignment
+    }
 }
 
 std::string EscalateCommand::describe() const {

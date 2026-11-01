@@ -2,6 +2,7 @@
 #include "CompletedState.h"
 #include "RejectedState.h"
 #include "CancelledState.h"
+#include "EscalatedState.h"
 #include "WorkItem.h"
 #include <stdexcept>
 
@@ -18,9 +19,6 @@ void StartedState::start(WorkItem* context) {
     throw std::logic_error("Item is already Started.");
 }
 
-void StartedState::escalate(WorkItem* context) {
-    throw std::logic_error("Cannot escalate an actively Started item.");
-}
 
 // --- Legal Transitions ---
 void StartedState::complete(WorkItem* context) {
@@ -31,6 +29,12 @@ void StartedState::complete(WorkItem* context) {
 void StartedState::reject(WorkItem* context) {
     // Work finished, but the outcome was 'no'[cite: 14].
     context->changeState(new RejectedState());
+}
+
+void StartedState::escalate(WorkItem* context) {
+    // The deadline passed while the work was in progress (bug 4). The step goes to the
+    // escalation path, is reassigned, and gets a fresh deadline, like overdue Available work.
+    context->changeState(new EscalatedState());
 }
 
 void StartedState::cancel(WorkItem* context) {

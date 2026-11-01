@@ -81,10 +81,11 @@ const StateSpec ALL_STATES[] = {
      {  "Available", nullptr, nullptr, nullptr, nullptr, nullptr, nullptr }},
     {"Available", driveToAvailable,
      {  nullptr, "Assigned", nullptr, nullptr, nullptr, "Cancelled", "Escalated" }},
+    // Bug 4: overdue work that is already Assigned or Started can be escalated too.
     {"Assigned",  driveToAssigned,
-     {  nullptr, nullptr, "Started", nullptr, nullptr, "Cancelled", nullptr }},
+     {  nullptr, nullptr, "Started", nullptr, nullptr, "Cancelled", "Escalated" }},
     {"Started",   driveToStarted,
-     {  nullptr, nullptr, nullptr, "Completed", "Rejected", "Cancelled", nullptr }},
+     {  nullptr, nullptr, nullptr, "Completed", "Rejected", "Cancelled", "Escalated" }},
     {"Escalated", driveToEscalated,
      {  nullptr, "Assigned", nullptr, nullptr, nullptr, "Cancelled", nullptr }},
     {"Completed", driveToCompleted,
