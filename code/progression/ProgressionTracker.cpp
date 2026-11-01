@@ -74,12 +74,13 @@ ProgressionResult ProgressionTracker::finish(const std::string& item, const Data
     }
 
     releaseWaiting(result);
+    dropUnreachable(result);
 
     result.instanceComplete = isComplete();
     return result;
 }
 
-void ProgressionTracker::cancel(const std::string& item) {
+ProgressionResult ProgressionTracker::cancel(const std::string& item) {
     if (!started) {
         throw std::logic_error("ProgressionTracker: cannot cancel '" + item + "' before the instance starts");
     }
@@ -90,6 +91,12 @@ void ProgressionTracker::cancel(const std::string& item) {
     removeFrom(available, item);
     removeFrom(waiting, item);
     cancelled.insert(item);
+
+    ProgressionResult result;
+    result.outcome = "Cancelled";
+    dropUnreachable(result);
+    result.instanceComplete = isComplete();
+    return result;
 }
 
 void ProgressionTracker::block(const std::string& item) {
@@ -127,8 +134,8 @@ ProgressionResult ProgressionTracker::reject(const WorkflowComponent* item, cons
     return reject(name, *instanceData);
 }
 
-void ProgressionTracker::cancel(const WorkflowComponent* item) {
-    cancel(nameOf(item));
+ProgressionResult ProgressionTracker::cancel(const WorkflowComponent* item) {
+    return cancel(nameOf(item));
 }
 
 void ProgressionTracker::reach(const std::string& item, ProgressionResult& result) {
@@ -145,9 +152,38 @@ void ProgressionTracker::reach(const std::string& item, ProgressionResult& resul
     if (dependencies.isSatisfied(item, completed)) {
         available.push_back(item);
         result.madeAvailable.push_back(item);
+    } else if (canNeverStart(item)) {
+        // Parking it in `waiting` would stall the instance for good.
+        cancelled.insert(item);
+        result.dropped.push_back(item);
     } else {
         waiting.push_back(item);
         result.waiting.push_back(item);
+    }
+}
+
+bool ProgressionTracker::canNeverStart(const std::string& item) const {
+    const std::vector<std::string> unmet = dependencies.unmetPrerequisites(item, completed);
+    for (std::size_t i = 0; i < unmet.size(); ++i) {
+        if (isCancelled(unmet[i]) || isRejected(unmet[i])) return true;
+    }
+    return false;
+}
+
+void ProgressionTracker::dropUnreachable(ProgressionResult& result) {
+    bool droppedOne = true;
+    while (droppedOne) {   // dropping one item can strand the items waiting on it
+        droppedOne = false;
+        for (std::size_t i = 0; i < waiting.size(); ++i) {
+            if (!canNeverStart(waiting[i])) continue;
+            const std::string item = waiting[i];
+            removeFrom(waiting, item);
+            removeFrom(result.waiting, item);
+            cancelled.insert(item);
+            result.dropped.push_back(item);
+            droppedOne = true;
+            break;
+        }
     }
 }
 
@@ -197,6 +233,7 @@ ProgressionResult ProgressionTracker::activate(const std::string& item) {
     result.outcome = "Activated";
     reach(item, result);
     releaseWaiting(result);
+    dropUnreachable(result);
     result.instanceComplete = isComplete();
     return result;
 }

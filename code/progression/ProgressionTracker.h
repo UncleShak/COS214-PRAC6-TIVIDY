@@ -31,6 +31,10 @@ struct ProgressionResult {
     /// Reached again after they had finished (retry loop). CompletedState, RejectedState and
     /// CancelledState are final, so the instance gives these a fresh WorkItem in CreatedState.
     std::vector<std::string> reopened;
+    /// Can never start: a prerequisite was cancelled or rejected, so it would wait forever.
+    /// The tracker counts these as cancelled (they were never opened, so they stay Created).
+    /// If routing reaches one again later (a retry), it is reopened like any cancelled item.
+    std::vector<std::string> dropped;
     bool instanceComplete;                   ///< nothing available or waiting any more
     ProgressionResult() : instanceComplete(false) {}
 };
@@ -64,7 +68,8 @@ public:
     /// dependencies on it.
     ProgressionResult reject(const std::string& item, const DataPayload& instanceData);
     /// Item abandoned (WorkItem -> CancelledState): no routing, removed from available/waiting.
-    void cancel(const std::string& item);
+    /// Waiting items that needed it can never start, so they are dropped (see ProgressionResult).
+    ProgressionResult cancel(const std::string& item);
     // Interrupt-only cancellation: also prevent future routing into this task.
     // Unlike ordinary cancel(), accepts tasks that have not been reached yet.
     void block(const std::string& item);
@@ -83,7 +88,7 @@ public:
     /// @throws std::invalid_argument if item is null.
     ProgressionResult complete(const WorkflowComponent* item, const DataPayload* instanceData);
     ProgressionResult reject(const WorkflowComponent* item, const DataPayload* instanceData);
-    void cancel(const WorkflowComponent* item);
+    ProgressionResult cancel(const WorkflowComponent* item);
 
     bool isAvailable(const std::string& item) const;
     bool isWaiting(const std::string& item) const;
@@ -112,6 +117,10 @@ private:
     ProgressionResult finish(const std::string& item, const DataPayload& instanceData, bool rejected);
     void reach(const std::string& item, ProgressionResult& result);
     void releaseWaiting(ProgressionResult& result);
+    /// A prerequisite of `item` was cancelled or rejected, so `item` can never become Available.
+    bool canNeverStart(const std::string& item) const;
+    /// Drops every waiting item that can never start, repeating while drops make more of them.
+    void dropUnreachable(ProgressionResult& result);
     static std::string nameOf(const WorkflowComponent* item);
 
     const RoutingRule& routing;
