@@ -124,6 +124,8 @@ private:
     std::set<std::string> completed;
     std::set<std::string> rejected;
     std::set<std::string> cancelled;
+
+    std::set<std::string> blocked;
 };
 
 #endif
