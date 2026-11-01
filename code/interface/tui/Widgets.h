@@ -25,14 +25,42 @@
 namespace tividy {
 namespace ui {
 
-/** @brief One line of text and its colour. */
-struct Line {
+/** @brief A run of text in one colour, part of a Line. */
+struct Span {
     std::string text;
     Tone tone;
 
+    Span(const std::string& t, Tone c) : text(t), tone(c) {}
+};
+
+/**
+ * @brief One line of text and its colour. A line may instead be built from spans (a bullet,
+ *        then a label in another colour), with more spans right-aligned (a state).
+ */
+struct Line {
+    std::string text;
+    Tone tone;
+    std::vector<Span> spans; ///< drawn instead of text when not empty
+    std::vector<Span> right; ///< drawn right-aligned
+
     Line() : tone(Tone::Text) {}
     Line(const std::string& t, Tone c = Tone::Text) : text(t), tone(c) {}
+
+    /** @brief Appends a span on the left. @return this line, to chain calls */
+    Line& add(const std::string& t, Tone c) { spans.push_back(Span(t, c)); return *this; }
+    /** @brief Appends a span to the right-aligned part. @return this line */
+    Line& addRight(const std::string& t, Tone c) { right.push_back(Span(t, c)); return *this; }
 };
+
+/**
+ * @brief Draws @p line in the @p width cells starting at (y, x).
+ * @param chosen fill the cells with the line-colour selection bar first; plain text becomes
+ *               bold white, key bullets turn white with line-colour text, coloured bullets stay
+ */
+void putLine(WINDOW* window, int y, int x, int width, const Line& line, bool chosen);
+
+/** @brief A route bullet: @p key with one space each side, e.g. " C ". */
+std::string bullet(const std::string& key);
 
 /** @brief Writes @p text (UTF-8) at (y, x), cut to fit the window width minus @p margin, in cells. */
 void putText(WINDOW* window, int y, int x, const std::string& text, Tone tone, int margin = 1);
@@ -51,7 +79,7 @@ void fillRow(WINDOW* window, int y, int x, int width, Tone tone);
 /** @brief Writes UTF-8 decoration (block and box characters) at (y, x) without cutting it. */
 void putGlyphs(WINDOW* window, int y, int x, const char* glyphs, Tone tone);
 
-/** @brief One list row: a cyan selection bar with a pointer when @p chosen. */
+/** @brief One list row: a line-colour selection bar when @p chosen. */
 void putRow(WINDOW* window, int y, int x, int width, const std::string& text, Tone tone, bool chosen);
 
 /** @brief @p text cut or padded with spaces to exactly @p width terminal cells (UTF-8 aware). */

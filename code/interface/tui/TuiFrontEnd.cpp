@@ -25,6 +25,15 @@ const WorkAction kActions[] = {WorkAction::Assign, WorkAction::Start, WorkAction
                                WorkAction::Reject, WorkAction::Cancel, WorkAction::Escalate};
 const int kActionCount = 6;
 
+/** The route bullet of each action in the Detail pane: its key letter and colour. */
+struct ActionBullet { WorkAction action; const char* key; Tone tone; };
+const ActionBullet kActionBullets[] = {
+    {WorkAction::Start, "S", Tone::BulletLine},     {WorkAction::Complete, "C", Tone::BulletGreen},
+    {WorkAction::Reject, "R", Tone::BulletRed},     {WorkAction::Escalate, "E", Tone::Escalated},
+    {WorkAction::Assign, "A", Tone::BulletPurple},  {WorkAction::Cancel, "X", Tone::Key},
+};
+const int kActionBulletCount = 6;
+
 std::string number(int value) {
     char text[16];
     std::snprintf(text, sizeof(text), "%d", value);
@@ -128,6 +137,18 @@ bool TuiFrontEnd::handleGlobal(int key) {
     case kCtrlL:
         clearok(curscr, TRUE);
         return true;
+    case 'i':
+        if (screen_ != Screen::Industries) {
+            enter(Screen::Industries);
+            return true;
+        }
+        return false;
+    case 'd':
+        if (screen_ != Screen::Dashboard && !controller_.view().instanceId.empty()) {
+            enter(Screen::Dashboard);
+            return true;
+        }
+        return false;
     case 'p':
         if (working) {
             chooseActor();
@@ -676,6 +697,7 @@ void TuiFrontEnd::showHelp() {
     lines.push_back(Line("  :                type a command (the same commands as tividy --plain)"));
     lines.push_back(Line("  ?                this help         q                     quit (asks first)"));
     lines.push_back(Line("  Ctrl+L           redraw            Ctrl+C                quit at once"));
+    lines.push_back(Line("  i                industries        d                     dashboard"));
     lines.push_back(Line());
 
     switch (screen_) {
@@ -858,7 +880,10 @@ std::vector<Line> TuiFrontEnd::listRows(int width) const {
     std::vector<Line> rows;
     if (screen_ == Screen::Industries) {
         for (std::size_t i = 0; i < view.industries.size(); ++i) {
-            rows.push_back(Line(view.industries[i].displayName));
+            Line row;
+            row.add(" ", Tone::Text).add(bullet(number(static_cast<int>(i) + 1)), Theme::industryBullet(static_cast<int>(i)));
+            row.add("  " + view.industries[i].displayName, Tone::TextBold);
+            rows.push_back(row);
         }
     } else if (screen_ == Screen::Instances) {
         const std::size_t nameWidth = static_cast<std::size_t>(std::max(8, width - 25));
@@ -965,15 +990,30 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
         lines.push_back(Line("Due:          -"));
     }
 
+    lines.push_back(Line());
+    lines.push_back(Line("ALLOWED NOW", Tone::Muted));
     const std::vector<WorkAction> hinted = InterfaceController::hintedActions(item->state);
-    std::string allowed;
-    for (std::size_t i = 0; i < hinted.size(); ++i) {
-        allowed += (i == 0 ? "" : ", ") + std::string(actionName(hinted[i]));
+    Line row;
+    int inRow = 0;
+    for (int i = 0; i < kActionBulletCount; ++i) {
+        if (std::find(hinted.begin(), hinted.end(), kActionBullets[i].action) == hinted.end()) {
+            continue;
+        }
+        row.add(bullet(kActionBullets[i].key), kActionBullets[i].tone);
+        row.add(" " + fit(actionName(kActionBullets[i].action), 11), Tone::Text);
+        if (++inRow == 2) {
+            lines.push_back(row);
+            row = Line();
+            inRow = 0;
+        }
     }
-    if (allowed.empty()) {
-        allowed = isFinal(item->state) ? "nothing (final state)" : "nothing until it becomes available";
+    if (inRow > 0) {
+        lines.push_back(row);
     }
-    lines.push_back(Line("Allowed now:  " + allowed));
+    if (hinted.empty()) {
+        lines.push_back(Line(isFinal(item->state) ? "Nothing: this stop is final." : "Nothing until it becomes available.",
+                             Tone::Muted));
+    }
 
     bool heading = false;
     for (std::size_t i = 0; i < view.approvals.size(); ++i) {
@@ -1100,23 +1140,47 @@ std::vector<std::string> TuiFrontEnd::breadcrumbs() const {
     return path;
 }
 
-std::string TuiFrontEnd::hints() const {
+std::vector<std::pair<std::string, std::string> > TuiFrontEnd::hints() const {
+    typedef std::pair<std::string, std::string> Hint;
+    std::vector<Hint> out;
+    const std::string enter = "\u23CE";
     switch (screen_) {
     case Screen::Industries:
-        return "Enter open   : command   ? help   q quit";
+        out.push_back(Hint(enter, "open"));
+        break;
     case Screen::Instances:
-        return "Enter open   n new instance   p act as   t clock   b back   : command   ? help   q quit";
+        out.push_back(Hint(enter, "open"));
+        out.push_back(Hint("n", "new train"));
+        out.push_back(Hint("p", "act as"));
+        out.push_back(Hint("t", "clock"));
+        out.push_back(Hint("b", "back"));
+        break;
     case Screen::Dashboard:
         if (showPanel_) {
-            return "Enter back to detail   (any other key also works)";
+            out.push_back(Hint(enter, "back to detail"));
+            break;
         }
-        return "Enter actions   v available/all   Tab detail   b back   ? help";
+        out.push_back(Hint(enter, "actions"));
+        out.push_back(Hint("v", "available/all"));
+        out.push_back(Hint("Tab", "detail"));
+        out.push_back(Hint("b", "back"));
+        break;
     case Screen::History:
-        return "Up/Down scroll   o oldest/newest first   / filter   Esc clear filter   b back   ? help";
+        out.push_back(Hint("o", "oldest/newest"));
+        out.push_back(Hint("/", "filter"));
+        out.push_back(Hint("Esc", "clear filter"));
+        out.push_back(Hint("b", "back"));
+        break;
     case Screen::Reports:
-        return "Left/Right switch report   Up/Down scroll   r reload   b back   ? help";
+        out.push_back(Hint("\u2190\u2192", "switch report"));
+        out.push_back(Hint("r", "reload"));
+        out.push_back(Hint("b", "back"));
+        break;
     }
-    return "";
+    out.push_back(Hint(":", "command"));
+    out.push_back(Hint("?", "help"));
+    out.push_back(Hint("q", "quit"));
+    return out;
 }
 
 // ---- drawing ----------------------------------------------------------------------------
@@ -1251,38 +1315,41 @@ void TuiFrontEnd::drawMenu() {
     const bool inIndustry = !controller_.view().industryId.empty();
     struct Entry { const char* label; const char* key; bool screen; Screen target; bool enabled; };
     const Entry entries[] = {
-        {"INDUSTRY",  "",  true,  Screen::Industries, true},
-        {"INSTANCES", "b", true,  Screen::Instances,  inIndustry},
-        {"DASHBOARD", "",  true,  Screen::Dashboard,  inInstance},
-        {"HISTORY",   "h", true,  Screen::History,    inInstance},
-        {"REPORTS",   "r", true,  Screen::Reports,    inInstance},
+        {"Industry",  "i", true,  Screen::Industries, true},
+        {"Instances", "b", true,  Screen::Instances,  inIndustry},
+        {"Dashboard", "d", true,  Screen::Dashboard,  inInstance},
+        {"History",   "h", true,  Screen::History,    inInstance},
+        {"Reports",   "r", true,  Screen::Reports,    inInstance},
         {"", "", false, Screen::Industries, false},
-        {"APPROVE",   "a", false, Screen::Dashboard,  inInstance},
-        {"EVENT",     "e", false, Screen::Dashboard,  inInstance},
-        {"UNDO",      "u", false, Screen::Dashboard,  inInstance},
-        {"CLOCK",     "t", false, Screen::Dashboard,  inIndustry},
-        {"ACT AS",    "p", false, Screen::Dashboard,  inIndustry},
-        {"COMMAND",   ":", false, Screen::Dashboard,  true},
-        {"HELP",      "?", false, Screen::Dashboard,  true},
-        {"QUIT",      "q", false, Screen::Dashboard,  true},
+        {"Approve",   "a", false, Screen::Dashboard,  inInstance},
+        {"Event",     "e", false, Screen::Dashboard,  inInstance},
+        {"Undo",      "u", false, Screen::Dashboard,  inInstance},
+        {"Clock",     "t", false, Screen::Dashboard,  inIndustry},
+        {"Act as",    "p", false, Screen::Dashboard,  inIndustry},
+        {"Command",   ":", false, Screen::Dashboard,  true},
+        {"Help",      "?", false, Screen::Dashboard,  true},
+        {"Quit",      "q", false, Screen::Dashboard,  true},
     };
-    const int width = getmaxx(w);
+    const int inner = getmaxx(w) - 2;
     int y = 1;
     for (std::size_t i = 0; i < sizeof(entries) / sizeof(entries[0]) && y < getmaxy(w) - 1; ++i, ++y) {
         const Entry& e = entries[i];
         if (e.label[0] == '\0') {
-            putText(w, y, 2, std::string(static_cast<std::size_t>(width - 4), '-'), Tone::Dim, 0);
+            std::string rule;
+            for (int c = 0; c < inner - 2; ++c) {
+                rule += "\u2500";
+            }
+            putText(w, y, 2, rule, Tone::Dim, 0);
             continue;
         }
         const bool current = e.screen && e.target == screen_;
+        Line row;
+        row.add(bullet(e.key), e.enabled ? Tone::Key : Tone::Dim);
+        row.add(" " + std::string(e.label), current ? Tone::Select : (e.enabled ? Tone::Text : Tone::Dim));
         if (current) {
-            putText(w, y, 1, fit(" " + std::string(e.label), static_cast<std::size_t>(width - 2)), Tone::Select, 0);
-        } else {
-            putText(w, y, 2, e.label, e.enabled ? Tone::Text : Tone::Dim, 0);
+            fillRow(w, y, 1, inner, Tone::Select);
         }
-        if (e.key[0] != '\0') {
-            putText(w, y, width - 4, e.key, current ? Tone::Select : Tone::Muted, 0);
-        }
+        putLine(w, y, 2, inner - 2, row, current);
     }
     touchwin(w);
     wnoutrefresh(w);
@@ -1336,10 +1403,13 @@ void TuiFrontEnd::drawPanes() {
         const int index = listTop_ + row;
         const bool chosen = index == selected_;
         if (chosen && focus_ != Pane::List) {
-            putRow(list, 1 + row, 2, width, rows[index].text, Tone::Line, false);
-            putGlyphs(list, 1 + row, 2, "\u25B7", Tone::Line);
+            fillRow(list, 1 + row, 1, getmaxx(list) - 2, Tone::Band);
+            putLine(list, 1 + row, 2, width, rows[index], false);
         } else {
-            putRow(list, 1 + row, 2, width, rows[index].text, rows[index].tone, chosen);
+            if (chosen) {
+                fillRow(list, 1 + row, 1, getmaxx(list) - 2, Tone::Select);
+            }
+            putLine(list, 1 + row, 2, width, rows[index], chosen);
         }
     }
     if (listTop_ > 0) {
@@ -1368,7 +1438,7 @@ void TuiFrontEnd::drawPanes() {
     const int shown = std::max(1, getmaxy(detail) - 2);
     detailTop_ = std::max(0, std::min(detailTop_, static_cast<int>(lines.size()) - shown));
     for (int row = 0; row < shown && detailTop_ + row < static_cast<int>(lines.size()); ++row) {
-        putText(detail, 1 + row, 2, lines[detailTop_ + row].text, lines[detailTop_ + row].tone, 2);
+        putLine(detail, 1 + row, 2, getmaxx(detail) - 4, lines[detailTop_ + row], false);
     }
     if (detailTop_ + shown < static_cast<int>(lines.size())) {
         putText(detail, getmaxy(detail) - 1, getmaxx(detail) - 22, " more v (Tab, Down) ", Tone::Muted, 1);
@@ -1420,7 +1490,12 @@ void TuiFrontEnd::drawBody() {
 void TuiFrontEnd::drawFooter() {
     WINDOW* w = layout_.footer();
     werase(w);
-    putText(w, 0, 1, hints(), Tone::Muted, 0);
+    const std::vector<std::pair<std::string, std::string> > keys = hints();
+    Line row;
+    for (std::size_t i = 0; i < keys.size(); ++i) {
+        row.add(bullet(keys[i].first), Tone::Key).add(" " + keys[i].second + "   ", Tone::Muted);
+    }
+    putLine(w, 0, 1, COLS - 2, row, false);
     touchwin(w);
     wnoutrefresh(w);
 }

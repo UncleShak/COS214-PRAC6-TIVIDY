@@ -143,12 +143,67 @@ void putRow(WINDOW* window, int y, int x, int width, const std::string& text, To
     if (width <= 2) {
         return;
     }
-    if (chosen) {
-        putText(window, y, x, fit("  " + text, static_cast<std::size_t>(width)), Tone::Select, 0);
-        putGlyphs(window, y, x, "\u25B6", Tone::Select);
-    } else {
-        putText(window, y, x, fit("  " + text, static_cast<std::size_t>(width)), tone, 0);
+    putLine(window, y, x, width, Line(" " + text, tone), chosen);
+}
+
+namespace {
+
+/** The tone a span takes inside the selection bar. */
+Tone onSelection(Tone tone) {
+    switch (tone) {
+    case Tone::Key:
+    case Tone::KeyMuted:
+        return Tone::SelectBullet;
+    case Tone::Escalated:
+    case Tone::BulletLine:
+    case Tone::BulletGreen:
+    case Tone::BulletRed:
+    case Tone::BulletPurple:
+    case Tone::Bullet1:
+    case Tone::Bullet2:
+        return tone;
+    default:
+        return Tone::Select;
     }
+}
+
+/** Draws spans from x, never past @p end. @return the column after the last cell drawn */
+int putSpans(WINDOW* window, int y, int x, int end, const std::vector<Span>& spans, bool chosen) {
+    for (std::size_t i = 0; i < spans.size() && x < end; ++i) {
+        const std::string shown = cutCells(spans[i].text, static_cast<std::size_t>(end - x));
+        putText(window, y, x, shown, chosen ? onSelection(spans[i].tone) : spans[i].tone, 0);
+        x += static_cast<int>(cells(shown));
+    }
+    return x;
+}
+
+} // namespace
+
+void putLine(WINDOW* window, int y, int x, int width, const Line& line, bool chosen) {
+    if (width <= 0) {
+        return;
+    }
+    if (chosen) {
+        fillRow(window, y, x, width, Tone::Select);
+    }
+    int rightWidth = 0;
+    for (std::size_t i = 0; i < line.right.size(); ++i) {
+        rightWidth += static_cast<int>(cells(line.right[i].text));
+    }
+    const int end = x + width;
+    const int rightX = std::max(x, end - rightWidth);
+    const int leftEnd = line.right.empty() ? end : std::max(x, rightX - 1);
+    if (line.spans.empty()) {
+        std::vector<Span> one(1, Span(line.text, line.tone));
+        putSpans(window, y, x, leftEnd, one, chosen);
+    } else {
+        putSpans(window, y, x, leftEnd, line.spans, chosen);
+    }
+    putSpans(window, y, rightX, end, line.right, chosen);
+}
+
+std::string bullet(const std::string& key) {
+    return " " + key + " ";
 }
 
 std::string fit(const std::string& text, std::size_t width) {

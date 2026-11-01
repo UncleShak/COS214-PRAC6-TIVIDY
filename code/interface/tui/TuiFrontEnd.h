@@ -25,6 +25,7 @@
 #define TIVIDY_TUI_FRONT_END_H
 
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <curses.h>
@@ -102,7 +103,8 @@ private:
     std::string emptyListText() const;
     /** @brief Header breadcrumbs after TIVIDY: industry, instance, screen. */
     std::vector<std::string> breadcrumbs() const;
-    std::string hints() const;
+    /** @brief Footer hints as (key, label) pairs, drawn as small key bullets. */
+    std::vector<std::pair<std::string, std::string> > hints() const;
 
     // ---- drawing
     /** @brief Index of the industry whose line colour is shown (the cursor's, on the Industries screen). */
