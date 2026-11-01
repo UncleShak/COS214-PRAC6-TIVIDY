@@ -40,14 +40,38 @@ int scrollTo(int selected, int top, int visible) {
 
 } // namespace
 
+std::size_t cells(const std::string& text) {
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if ((static_cast<unsigned char>(text[i]) & 0xC0) != 0x80) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+std::string cutCells(const std::string& text, std::size_t width) {
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if ((static_cast<unsigned char>(text[i]) & 0xC0) != 0x80) {
+            if (count == width) {
+                return text.substr(0, i);
+            }
+            ++count;
+        }
+    }
+    return text;
+}
+
 void putText(WINDOW* window, int y, int x, const std::string& text, Tone tone, int margin) {
     int width = getmaxx(window) - x - margin;
     if (width <= 0 || y < 0 || y >= getmaxy(window)) {
         return;
     }
+    const std::string shown = cutCells(text, static_cast<std::size_t>(width));
     int attr = Theme::attr(tone);
     wattron(window, attr);
-    mvwaddnstr(window, y, x, text.c_str(), width);
+    mvwaddstr(window, y, x, shown.c_str());
     wattroff(window, attr);
 }
 
@@ -61,32 +85,57 @@ void putGlyphs(WINDOW* window, int y, int x, const char* glyphs, Tone tone) {
     wattroff(window, attr);
 }
 
-void drawFrame(WINDOW* window, const std::string& title, bool focused) {
-    int border = Theme::attr(focused ? Tone::Gold : Tone::Muted);
+namespace {
+
+#ifdef NCURSES_WIDECHAR
+/** One wide box-drawing character as a cchar_t, for wborder_set. */
+cchar_t boxChar(const wchar_t* glyph) {
+    cchar_t c;
+    setcchar(&c, glyph, A_NORMAL, 0, 0);
+    return c;
+}
+#endif
+
+} // namespace
+
+void drawFrame(WINDOW* window, const std::string& title, bool focused, const std::string& right) {
+    const int border = Theme::attr(focused ? Tone::BorderFocus : Tone::Border);
     wattron(window, border);
 #ifdef NCURSES_WIDECHAR
-    // Unicode box drawing (heavy when focused), not the terminal's line-drawing mode.
-    if (focused) {
-        wborder_set(window, WACS_T_VLINE, WACS_T_VLINE, WACS_T_HLINE, WACS_T_HLINE,
-                    WACS_T_ULCORNER, WACS_T_URCORNER, WACS_T_LLCORNER, WACS_T_LRCORNER);
-    } else {
-        wborder_set(window, WACS_VLINE, WACS_VLINE, WACS_HLINE, WACS_HLINE,
-                    WACS_ULCORNER, WACS_URCORNER, WACS_LLCORNER, WACS_LRCORNER);
-    }
+    const cchar_t vertical = boxChar(L"\u2502");
+    const cchar_t horizontal = boxChar(L"\u2500");
+    const cchar_t topLeft = boxChar(L"\u256D");
+    const cchar_t topRight = boxChar(L"\u256E");
+    const cchar_t bottomLeft = boxChar(L"\u2570");
+    const cchar_t bottomRight = boxChar(L"\u256F");
+    wborder_set(window, &vertical, &vertical, &horizontal, &horizontal, &topLeft, &topRight, &bottomLeft,
+                &bottomRight);
 #else
     box(window, 0, 0);
 #endif
     wattroff(window, border);
-    if (!title.empty()) {
-        // A slanted tab, like the Persona menu headers:  ◢ TITLE ◤
-        const std::string label = " " + title + " ";
-        const int room = getmaxx(window) - 7;
-        if (room > 4) {
-            putGlyphs(window, 0, 2, "\u25E2", focused ? Tone::Gold : Tone::Muted);
-            putText(window, 0, 3, label.substr(0, static_cast<std::size_t>(room)), focused ? Tone::Title : Tone::Strip, 1);
-            const int end = 3 + static_cast<int>(std::min(label.size(), static_cast<std::size_t>(room)));
-            putGlyphs(window, 0, end, "\u25E4", focused ? Tone::Gold : Tone::Muted);
+
+    const int width = getmaxx(window);
+    int plateEnd = 2;
+    if (!title.empty() && width > 8) {
+        const std::string plate = " " + title + " ";
+        const std::size_t room = static_cast<std::size_t>(width - 4);
+        const std::string shown = plate.substr(0, std::min(plate.size(), room));
+        putText(window, 0, 2, shown, focused ? Tone::Plate : Tone::PlateBand, 0);
+        plateEnd = 2 + static_cast<int>(shown.size());
+    }
+    if (!right.empty()) {
+        const std::string summary = " " + right + " ";
+        const int x = width - 2 - static_cast<int>(summary.size());
+        if (x > plateEnd + 1) {
+            putText(window, 0, x, summary, Tone::Muted, 0);
         }
+    }
+}
+
+void fillRow(WINDOW* window, int y, int x, int width, Tone tone) {
+    if (width > 0) {
+        putText(window, y, x, std::string(static_cast<std::size_t>(width), ' '), tone, 0);
     }
 }
 
@@ -94,19 +143,115 @@ void putRow(WINDOW* window, int y, int x, int width, const std::string& text, To
     if (width <= 2) {
         return;
     }
-    if (chosen) {
-        putText(window, y, x, fit("  " + text, static_cast<std::size_t>(width)), Tone::Select, 0);
-        putGlyphs(window, y, x, "\u25B6", Tone::Select);
-    } else {
-        putText(window, y, x, fit("  " + text, static_cast<std::size_t>(width)), tone, 0);
+    putLine(window, y, x, width, Line(" " + text, tone), chosen);
+}
+
+namespace {
+
+/** The tone a span takes inside the selection bar. */
+Tone onSelection(Tone tone) {
+    switch (tone) {
+    case Tone::Key:
+    case Tone::KeyMuted:
+        return Tone::SelectBullet;
+    case Tone::Escalated:
+    case Tone::BulletLine:
+    case Tone::BulletGreen:
+    case Tone::BulletRed:
+    case Tone::BulletPurple:
+    case Tone::Bullet1:
+    case Tone::Bullet2:
+        return tone;
+    default:
+        return Tone::Select;
     }
 }
 
-std::string fit(const std::string& text, std::size_t width) {
-    if (text.size() >= width) {
-        return text.substr(0, width);
+/** Draws spans from x, never past @p end. @return the column after the last cell drawn */
+int putSpans(WINDOW* window, int y, int x, int end, const std::vector<Span>& spans, bool chosen) {
+    for (std::size_t i = 0; i < spans.size() && x < end; ++i) {
+        const std::string shown = cutCells(spans[i].text, static_cast<std::size_t>(end - x));
+        putText(window, y, x, shown, chosen ? onSelection(spans[i].tone) : spans[i].tone, 0);
+        x += static_cast<int>(cells(shown));
     }
-    return text + std::string(width - text.size(), ' ');
+    return x;
+}
+
+} // namespace
+
+void putLine(WINDOW* window, int y, int x, int width, const Line& line, bool chosen) {
+    if (width <= 0) {
+        return;
+    }
+    if (chosen) {
+        fillRow(window, y, x, width, Tone::Select);
+    }
+    int rightWidth = 0;
+    for (std::size_t i = 0; i < line.right.size(); ++i) {
+        rightWidth += static_cast<int>(cells(line.right[i].text));
+    }
+    const int end = x + width;
+    const int rightX = std::max(x, end - rightWidth);
+    const int leftEnd = line.right.empty() ? end : std::max(x, rightX - 1);
+    if (line.spans.empty()) {
+        std::vector<Span> one(1, Span(line.text, line.tone));
+        putSpans(window, y, x, leftEnd, one, chosen);
+    } else {
+        putSpans(window, y, x, leftEnd, line.spans, chosen);
+    }
+    putSpans(window, y, rightX, end, line.right, chosen);
+}
+
+std::string bullet(const std::string& key) {
+    return " " + key + " ";
+}
+
+std::string fit(const std::string& text, std::size_t width) {
+    const std::size_t used = cells(text);
+    if (used >= width) {
+        return cutCells(text, width);
+    }
+    return text + std::string(width - used, ' ');
+}
+
+std::vector<std::string> wrap(const std::string& text, std::size_t width) {
+    std::vector<std::string> out;
+    std::string rest = text;
+    while (width > 0 && cells(rest) > width) {
+        const std::string head = cutCells(rest, width + 1);
+        std::size_t space = head.rfind(' ');
+        if (space == std::string::npos || space == 0) {
+            const std::string piece = cutCells(rest, width);
+            out.push_back(piece);
+            rest = rest.substr(piece.size());
+        } else {
+            out.push_back(rest.substr(0, space));
+            rest = rest.substr(space + 1);
+        }
+    }
+    out.push_back(rest);
+    return out;
+}
+
+std::vector<Line> wrapLines(const std::vector<Line>& lines, std::size_t width) {
+    std::vector<Line> out;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        if (!lines[i].spans.empty() || !lines[i].right.empty() || cells(lines[i].text) <= width) {
+            out.push_back(lines[i]);
+            continue;
+        }
+        // keep a leading indent on the continuation lines
+        std::size_t indent = 0;
+        while (indent < lines[i].text.size() && lines[i].text[indent] == ' ') {
+            ++indent;
+        }
+        const std::string pad(indent, ' ');
+        const std::vector<std::string> parts = wrap(lines[i].text.substr(indent), width - indent);
+        for (std::size_t p = 0; p < parts.size(); ++p) {
+            out.push_back(Line(pad + parts[p], lines[i].tone));
+        }
+    }
+    return out;
 }
 
 bool isEnter(int key) {
@@ -187,11 +332,11 @@ bool Dialog::prompt(const std::string& title, const std::string& label, std::str
     for (;;) {
         werase(w);
         drawFrame(w, title, true);
-        putText(w, 1, 2, label, Tone::Bone, 2);
+        putText(w, 1, 2, label, Tone::Text, 2);
         const std::size_t room = static_cast<std::size_t>(std::max(1, getmaxx(w) - 8));
         const std::string shown = tail(typed, room);
-        putText(w, 3, 2, "> ", Tone::Gold, 2);
-        putText(w, 3, 4, shown, Tone::Bone, 2);
+        putText(w, 3, 2, "> ", Tone::Line, 2);
+        putText(w, 3, 4, shown, Tone::Text, 2);
         putText(w, 5, 2, "Enter confirm   Esc cancel", Tone::Muted, 2);
         wmove(w, 3, 4 + static_cast<int>(shown.size()));
 
@@ -227,7 +372,7 @@ bool Dialog::confirm(const std::string& question) {
     for (;;) {
         werase(w);
         drawFrame(w, "CONFIRM", true);
-        putText(w, 1, 2, question, Tone::Bone, 2);
+        putText(w, 1, 2, question, Tone::Text, 2);
         putText(w, 3, 2, "Enter/y yes   Esc/n no", Tone::Muted, 2);
 
         const int key = wgetch(w);
@@ -310,7 +455,7 @@ void Dialog::alert(const std::string& title, const std::string& subtitle, const 
     const int band = std::max(1, LINES / 2 - 4);
     putGlyphs(w, band - 2, 0, stripes.c_str(), Tone::Red);
     for (int row = band; row < band + 5; ++row) {
-        putText(w, row, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Banner, 0);
+        putText(w, row, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::BulletRed, 0);
     }
     std::string spaced;
     for (std::size_t i = 0; i < title.size(); ++i) {
@@ -318,8 +463,8 @@ void Dialog::alert(const std::string& title, const std::string& subtitle, const 
         spaced += ' ';
     }
     const std::string heading = "!  " + spaced + " !";
-    putText(w, band + 1, std::max(0, (COLS - static_cast<int>(heading.size())) / 2), heading, Tone::Banner, 0);
-    putText(w, band + 3, std::max(0, (COLS - static_cast<int>(subtitle.size())) / 2), subtitle, Tone::Banner, 0);
+    putText(w, band + 1, std::max(0, (COLS - static_cast<int>(heading.size())) / 2), heading, Tone::BulletRed, 0);
+    putText(w, band + 3, std::max(0, (COLS - static_cast<int>(subtitle.size())) / 2), subtitle, Tone::BulletRed, 0);
     putGlyphs(w, band + 6, 0, stripes.c_str(), Tone::Red);
 
     int y = band + 8;
@@ -352,6 +497,8 @@ bool Dialog::form(const std::string& title, const std::vector<DataField>& fields
         std::string label = fields[i].label;
         if (fields[i].numeric) {
             label += " (number)";
+        } else if (fields[i].yesNo) {
+            label += " (yes/no)";
         }
         if (fields[i].required) {
             label += " *";
@@ -377,16 +524,16 @@ bool Dialog::form(const std::string& title, const std::vector<DataField>& fields
         for (int i = 0; i < count; ++i) {
             const int y = 2 + 2 * i;
             const bool focused = i == current;
-            putText(w, y, 2, labels[i], focused ? Tone::Gold : Tone::Bone, 2);
+            putText(w, y, 2, labels[i], focused ? Tone::Line : Tone::Text, 2);
             std::string inside = tail(typed[i], room);
-            Tone tone = Tone::Bone;
+            Tone tone = Tone::Text;
             if (inside.empty() && !focused && !fields[i].defaultValue.empty()) {
                 inside = "default: " + fields[i].defaultValue;
                 tone = Tone::Muted;
             }
-            putText(w, y, inputX, "[", focused ? Tone::Gold : Tone::Muted, 1);
+            putText(w, y, inputX, "[", focused ? Tone::Line : Tone::Muted, 1);
             putText(w, y, inputX + 1, fit(inside, room), tone, 1);
-            putText(w, y, inputX + 1 + static_cast<int>(room), "]", focused ? Tone::Gold : Tone::Muted, 1);
+            putText(w, y, inputX + 1 + static_cast<int>(room), "]", focused ? Tone::Line : Tone::Muted, 1);
         }
         if (!error.empty()) {
             putText(w, 2 * count + 2, 2, "! " + error, Tone::Red, 2);

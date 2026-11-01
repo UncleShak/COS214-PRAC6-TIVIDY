@@ -106,9 +106,9 @@ std::vector<DataField> FakeEngine::startFields(const std::string& industryId,
         throw std::invalid_argument("unknown workflow definition '" + definitionName + "'");
     }
     std::vector<DataField> fields;
-    DataField amount = {"amount", "Order amount", true, true, ""};
-    DataField destination = {"destination", "Destination", false, true, ""};
-    DataField urgent = {"urgent", "Urgent (yes/no)", false, false, "no"};
+    DataField amount = {"amount", "Order amount", true, true, "", false};
+    DataField destination = {"destination", "Destination", false, true, "", false};
+    DataField urgent = {"urgent", "Urgent", false, false, "no", true};
     fields.push_back(amount);
     fields.push_back(destination);
     fields.push_back(urgent);

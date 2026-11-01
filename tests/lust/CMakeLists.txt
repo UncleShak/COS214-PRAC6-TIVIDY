@@ -29,6 +29,7 @@ add_executable(lust_tests
     test_approvals.cpp
     test_interpreter.cpp
     test_layout.cpp
+    test_route_line.cpp
 )
 target_include_directories(lust_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${REPO_ROOT}/code/interface)
 target_link_libraries(lust_tests lust_fake tividy_ui_core)

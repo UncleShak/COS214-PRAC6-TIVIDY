@@ -14,7 +14,9 @@
 #include "OverdueWorkVisitor.h"
 #include "Participant.h"
 #include "ProgressReportVisitor.h"
+#include "Stage.h"
 #include "WorkItem.h"
+#include "WorkflowVisitor.h"
 #include "WorkItemState.h"
 #include "WorkflowDefinition.h"
 #include "WorkflowEngine.h"
@@ -46,6 +48,9 @@ bool isNumber(const std::string& text) {
     std::strtod(text.c_str(), &end);
     return end != 0 && *end == '\0';
 }
+
+// The example data writes yes/no answers as "yes" or "no".
+bool isYesNo(const std::string& text) { return text == "yes" || text == "no"; }
 
 std::string approvalKey(int id) { return "APR-" + std::to_string(id); }
 
@@ -96,10 +101,49 @@ std::vector<IndustryInfo> RealEngine::listIndustries() const {
         info.id = factories[i]->getWorkflowName();
         info.displayName = factories[i]->getDisplayName();
         info.description = factories[i]->getDescription();
+        info.sector = factories[i]->getSector();
         info.definitions.push_back(factories[i]->getWorkflowName());
         all.push_back(info);
     }
     return all;
+}
+
+namespace {
+
+// Collects work-item names in definition order (Visitor over the definition's root stage).
+class ItemOrder : public WorkflowVisitor {
+public:
+    std::vector<std::string> names;
+    void visitWorkItem(WorkItem* item) override { names.push_back(item->getName()); }
+    void visitStage(Stage*) override {}
+};
+
+} // namespace
+
+std::vector<RouteStop> RealEngine::routeMap(const std::string& industryId, const std::string& definitionName) const {
+    const IndustryFactory& factory = industry(industryId);
+    if (definitionName != factory.getWorkflowName())
+        throw std::invalid_argument("No workflow called '" + definitionName + "' in " + factory.getDisplayName());
+    const WorkflowDefinition* definition = engine->getDefinition(factory.getWorkflowName());
+    ItemOrder order;
+    definition->getRootStage()->accept(&order);
+
+    std::map<std::string, std::string> splitsFrom;   // exception item -> main stop it leaves from
+    const std::vector<WorkflowDefinition::ExceptionRoute>& routes = definition->getExceptionRoutes();
+    for (std::size_t r = 0; r < routes.size(); ++r)
+        for (std::size_t i = 0; i < routes[r].items.size(); ++i)
+            splitsFrom.insert(std::make_pair(routes[r].items[i], routes[r].splitsFrom));
+
+    std::vector<RouteStop> stops;
+    for (std::size_t i = 0; i < order.names.size(); ++i) {
+        RouteStop stop;
+        stop.workItemId = order.names[i];
+        std::map<std::string, std::string>::const_iterator it = splitsFrom.find(order.names[i]);
+        stop.exception = it != splitsFrom.end();
+        if (stop.exception) stop.splitsFrom = it->second;
+        stops.push_back(stop);
+    }
+    return stops;
 }
 
 std::vector<DataField> RealEngine::startFields(const std::string& industryId, const std::string& definitionName) const {
@@ -118,6 +162,7 @@ std::vector<DataField> RealEngine::startFields(const std::string& industryId, co
         field.key = it->first;
         field.label = labelFor(it->first);
         field.numeric = isNumber(it->second);
+        field.yesNo = isYesNo(it->second);
         field.required = false;
         field.defaultValue = it->second;
         form.push_back(field);

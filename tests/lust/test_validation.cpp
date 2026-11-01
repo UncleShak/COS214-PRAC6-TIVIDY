@@ -57,8 +57,8 @@ TEST_CASE("parseMenuChoice takes a 1-based number within range") {
 }
 
 TEST_CASE("validateField applies required, numeric, length and default rules") {
-    DataField amount = {"amount", "Order amount", true, true, ""};
-    DataField urgent = {"urgent", "Urgent", false, false, "no"};
+    DataField amount = {"amount", "Order amount", true, true, "", false};
+    DataField urgent = {"urgent", "Urgent", false, false, "no", false};
     std::string cleaned;
 
     CHECK(validateField(amount, " 1500 ", cleaned) == "");
@@ -72,4 +72,19 @@ TEST_CASE("validateField applies required, numeric, length and default rules") {
 
     std::string tooLong(kMaxTextLength + 1, 'x');
     CHECK(validateField(urgent, tooLong, cleaned) != "");
+}
+
+TEST_CASE("validateField accepts only yes/no answers for a yes/no field") {
+    DataField delivered = {"delivered", "Delivered", false, false, "yes", true};
+    std::string cleaned;
+
+    CHECK(validateField(delivered, " Y ", cleaned) == "");
+    CHECK(cleaned == "yes");
+    CHECK(validateField(delivered, "false", cleaned) == "");
+    CHECK(cleaned == "no");
+    CHECK(validateField(delivered, "", cleaned) == "");
+    CHECK(cleaned == "yes");
+
+    CHECK(validateField(delivered, "150", cleaned) == "Delivered must be yes or no");
+    CHECK(validateField(delivered, "maybe", cleaned) == "Delivered must be yes or no");
 }

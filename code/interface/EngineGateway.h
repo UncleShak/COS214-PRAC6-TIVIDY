@@ -34,6 +34,7 @@ struct IndustryInfo {
     std::string id;                       ///< stable key, e.g. "arkham"
     std::string displayName;              ///< e.g. "ArkhamExpress"
     std::string description;              ///< one line shown on the industry picker
+    std::string sector;                   ///< e.g. "Logistics", shown on the About screen; may be ""
     std::vector<std::string> definitions; ///< definition names that can be started
 };
 
@@ -44,6 +45,7 @@ struct DataField {
     bool numeric;             ///< must parse like KeyValuePayload::getNumber
     bool required;            ///< empty input refused
     std::string defaultValue; ///< used when the user leaves an optional field empty
+    bool yesNo;               ///< must be yes/no (y/n, true/false); sent as "yes" or "no"
 };
 
 /** @brief A participant who can act on or be assigned work. */
@@ -67,6 +69,15 @@ struct WorkItemView {
     int dueAt;                 ///< deadline on the engine clock, -1 if none
 
     WorkItemView() : dueAt(-1) {}
+};
+
+/** @brief One stop on a definition's route map, in definition order. */
+struct RouteStop {
+    std::string workItemId;  ///< matches WorkItemView::id
+    std::string shortLabel;  ///< at most 8 chars; "" lets the interface shorten the name
+    bool exception;          ///< on an exception route (cancel, return, failure handling)
+    std::string splitsFrom;  ///< exception stops: the main-route stop the branch leaves from
+    RouteStop() : exception(false) {}
 };
 
 /** @brief Summary of one running or finished workflow instance. */
@@ -200,6 +211,13 @@ public:
 
     // ---- added for the real engine (Observer events and Memento undo) ----
     // Defaults refuse, so an engine without these (FakeEngine) still builds.
+
+    /** @brief The definition's main line and exception branches. Empty: the TUI draws every item. */
+    virtual std::vector<RouteStop> routeMap(const std::string& industryId,
+                                            const std::string& definitionName) const {
+        (void)industryId; (void)definitionName;
+        return std::vector<RouteStop>();
+    }
 
     /** @brief Domain events the industry reacts to, e.g. "WORM_SIGN". */
     virtual std::vector<std::string> eventTypes(const std::string& industryId) const {

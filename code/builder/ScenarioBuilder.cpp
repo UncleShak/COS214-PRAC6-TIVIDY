@@ -182,3 +182,12 @@ void ScenarioBuilder::buildCancellationItem(const std::string& item) {
     requireItem(item);
     product->cancellationItems.insert(item);
 }
+void ScenarioBuilder::buildExceptionRoute(const std::string& splitsFrom, const std::vector<std::string>& items) {
+    requireItem(splitsFrom);
+    if (items.empty()) throw std::invalid_argument("An exception route needs at least one item");
+    for (std::size_t i = 0; i < items.size(); ++i) requireItem(items[i]);
+    WorkflowDefinition::ExceptionRoute route;
+    route.splitsFrom = splitsFrom;
+    route.items = items;
+    product->exceptionRoutes.push_back(route);
+}

@@ -79,6 +79,13 @@ std::string validateField(const DataField& field, const std::string& raw, std::s
     if (field.numeric && !isNumber(value)) {
         return field.label + " must be a number";
     }
+    if (field.yesNo) {
+        bool answer;
+        if (!parseYesNo(value, answer)) {
+            return field.label + " must be yes or no";
+        }
+        value = answer ? "yes" : "no";
+    }
     cleaned = value;
     return "";
 }

@@ -26,6 +26,8 @@ public:
     virtual std::string getWorkflowName() const = 0;
     virtual std::string getDisplayName() const = 0;
     virtual std::string getDescription() const = 0;
+    /** @brief Sector shown beside the name, e.g. "Logistics". Empty if not given. */
+    virtual std::string getSector() const { return ""; }
     /** @brief Short prefix for instance ids, e.g. "AX" gives AX-1, AX-2. */
     virtual std::string getIdPrefix() const = 0;
 

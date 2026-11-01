@@ -25,6 +25,9 @@ protected:
     void buildDependency(const std::string& dependent, const std::string& prerequisite);
     void buildIdentityField(const std::string& field);
     void buildCancellationItem(const std::string& item);
+    /// Route map only (for the interface): `items` form an exception route leaving the main
+    /// line at `splitsFrom`. Does not change routing.
+    void buildExceptionRoute(const std::string& splitsFrom, const std::vector<std::string>& items);
     void buildPath(const std::string& from, const std::string& to);
     void buildBranch(const std::string& from, const RoutingCondition&, const std::vector<std::string>& targets);
     void buildDefaultBranch(const std::string& from, const std::vector<std::string>& targets);

@@ -117,6 +117,15 @@ public:
      */
     static std::vector<WorkAction> hintedActions(const std::string& state);
 
+    /**
+     * @brief The route map of @p definition in @p industryId: main line and exception branches.
+     *        Empty if the engine gives none or refuses; the caller then draws every item.
+     */
+    std::vector<RouteStop> routeMap(const std::string& industryId, const std::string& definition) const;
+
+    /** @brief Work items of any instance of the current industry (for overviews); empty if refused. */
+    std::vector<WorkItemView> workItemsOf(const std::string& instanceId) const;
+
     /** @brief Display name of the participant with @p participantId, or "" if unknown. */
     std::string participantName(const std::string& participantId) const;
 

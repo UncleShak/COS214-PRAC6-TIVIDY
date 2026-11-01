@@ -62,7 +62,7 @@ TEST_CASE("industry and start: guided usage, then an instance") {
     CHECK(c.ui.view().industryId == "fake-a");
 
     Reply needs = c("start");
-    CHECK(mentions(needs, "Usage: start amount=<number> destination=<text> [urgent=<text>]"));
+    CHECK(mentions(needs, "Usage: start amount=<number> destination=<text> [urgent=<yes/no>]"));
 
     Reply bad = c("start amount=lots destination=Gotham");
     CHECK(bad.status.text == "Invalid input: Order amount must be a number");

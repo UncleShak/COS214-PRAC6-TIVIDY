@@ -18,19 +18,31 @@ namespace {
 
 SCREEN* activeScreen = 0;
 
+/** Signals that would leave the terminal in curses mode if nobody restored it. */
+const int kGuardedSignals[] = {SIGINT, SIGTERM, SIGHUP, SIGSEGV, SIGABRT};
+const int kGuardedCount = 5;
+
 /**
- * Ctrl+C while ncurses is active: put the terminal back first, then exit. endwin() is not
- * strictly async-signal-safe, but it is the standard way to leave curses on SIGINT and the
- * process exits straight afterwards.
+ * Ctrl+C, a kill, a closed window or a crash while ncurses is active: put the terminal back
+ * first. endwin() is not strictly async-signal-safe, but it is the standard way to leave
+ * curses here and the process ends straight afterwards. Interrupts exit with 128 + signal;
+ * a crash is re-raised with the default action so it still produces its usual report.
  */
-void restoreAndExit(int) {
+void restoreAndExit(int sig) {
     endwin();
-    _exit(130);
+    if (sig == SIGSEGV || sig == SIGABRT) {
+        std::signal(sig, SIG_DFL);
+        std::raise(sig);
+    }
+    _exit(128 + sig);
 }
 
 } // namespace
 
-CursesSession::CursesSession() : colour_(false), previousHandler_(SIG_DFL) {
+CursesSession::CursesSession() : colour_(false) {
+    for (int i = 0; i < kSignalCount; ++i) {
+        previousHandlers_[i] = SIG_DFL;
+    }
     if (activeScreen != 0) {
         throw std::runtime_error("a curses session is already active");
     }
@@ -42,7 +54,9 @@ CursesSession::CursesSession() : colour_(false), previousHandler_(SIG_DFL) {
         throw std::runtime_error("cannot initialise the terminal (is TERM set?)");
     }
     set_term(activeScreen);
-    previousHandler_ = std::signal(SIGINT, restoreAndExit);
+    for (int i = 0; i < kGuardedCount; ++i) {
+        previousHandlers_[i] = std::signal(kGuardedSignals[i], restoreAndExit);
+    }
 
     cbreak();
     noecho();
@@ -63,7 +77,9 @@ CursesSession::~CursesSession() {
     endwin();
     delscreen(activeScreen);
     activeScreen = 0;
-    std::signal(SIGINT, previousHandler_);
+    for (int i = 0; i < kGuardedCount; ++i) {
+        std::signal(kGuardedSignals[i], previousHandlers_[i]);
+    }
     Log::write("curses session ended");
 }
 

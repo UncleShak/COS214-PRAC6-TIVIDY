@@ -49,3 +49,4 @@ std::vector<std::string> ArkhamExpressFactory::getEventTypes() const {
 }
 
 std::shared_ptr<WarehouseStub> ArkhamExpressFactory::getWarehouse() const { return warehouse; }
+std::string ArkhamExpressFactory::getSector() const { return "Logistics"; }

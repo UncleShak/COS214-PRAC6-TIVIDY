@@ -24,7 +24,9 @@
 #ifndef TIVIDY_TUI_FRONT_END_H
 #define TIVIDY_TUI_FRONT_END_H
 
+#include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <curses.h>
@@ -32,6 +34,7 @@
 #include "InterfaceController.h"
 #include "Layout.h"
 #include "LineInterpreter.h"
+#include "RouteLine.h"
 #include "Theme.h"
 #include "Widgets.h"
 
@@ -73,6 +76,21 @@ private:
     void newInstance();
     void chooseActor();
     void actionMenu();
+    /**
+     * @brief An action key (S C R E A X) on the dashboard. Reject and Cancel only arm a
+     *        confirmation; the same key again performs them. Refused with "only <Role> can ..."
+     *        when the actor lacks the item's role.
+     */
+    void actionKey(int key);
+    /** @brief Second key after an armed confirmation: the same key performs, any other cancels. */
+    void confirmKey(int key);
+    /**
+     * @brief Asks what the action needs (assignee, reason), sends it and shows the result.
+     * @param confirmed Cancel was already confirmed (by the double key press)
+     */
+    void performAction(WorkAction action, const WorkItemView& item, bool confirmed);
+    /** @brief The role @p action needs from the actor on @p item, if the actor lacks it; "" if allowed. */
+    std::string missingRole(WorkAction action, const WorkItemView& item) const;
     void approvalsMenu();
     void advanceClock();
     void raiseEvent();
@@ -91,29 +109,69 @@ private:
 
     // ---- what the screens show
     const std::vector<WorkItemView>& items() const;
+    /** @brief Indexes into items() in display order: main line first, then the exception route. */
+    std::vector<int> itemOrder() const;
     const WorkItemView* selectedItem() const;
+    /** @brief The engine's route map of a definition, fetched once and kept. */
+    const std::vector<RouteStop>& routeMapFor(const std::string& industryId, const std::string& definition) const;
+    /** @brief The selected instance's route line. */
+    RouteModel currentRoute() const;
+    /** @brief True if @p itemId is on an exception route of the selected instance's definition. */
+    bool isException(const std::string& itemId) const;
     const WorkItemView* findItem(const std::string& itemId) const;
     std::string industryName() const;
     int rowCount() const;
-    std::vector<Line> listRows(int width) const;
+    /**
+     * @brief The list's display rows.
+     * @param rowIndex set to the selectable index of each row, -1 for a heading
+     */
+    std::vector<Line> listRows(int width, std::vector<int>& rowIndex) const;
     std::vector<Line> detailLines() const;
     std::vector<Line> bodyLines() const;
     std::string listTitle() const;
+    /** @brief Right side of the list's top edge, e.g. "3 of 13 done". */
+    std::string listSummary() const;
     std::string emptyListText() const;
-    std::string breadcrumb() const;
-    std::string headerRight() const;
-    std::string hints() const;
+    /** @brief Header breadcrumbs after TIVIDY: industry, instance, screen. */
+    std::vector<std::string> breadcrumbs() const;
+    /** @brief Footer hints as (key, label) pairs, drawn as small key bullets. */
+    std::vector<std::pair<std::string, std::string> > hints() const;
 
     // ---- drawing
+    /** @brief Index of the industry whose line colour is shown (the cursor's, on the Industries screen). */
+    int lineIndustry() const;
     void draw();
+    /** @brief Only a centred "make the window bigger" message. */
     void drawTooSmall();
-    void drawTitle();
-    void drawCalendar();
+    /** @brief Two-row band: route bullet, TIVIDY and breadcrumbs, industry bullets; then context. */
+    void drawHeader();
+    /** @brief The full-width route box at the top of the dashboard. */
+    void drawRoute();
+    /** @brief The route box for @p route; @p travelTo and @p branchFill draw one animation frame. */
+    void drawRouteBox(const RouteModel& route, int travelTo, int branchFill);
+    /**
+     * @brief Animates the change from @p before to @p after: the current stop ◉ travels to the
+     *        next stop, or the exception branch fills in red. At most about 350 ms; skipped when
+     *        the stations don't fit (the compact form) or the dashboard is not showing.
+     */
+    void animateRoute(const RouteModel& before, const RouteModel& after);
+    /** @brief The two route bullets and TIVIDY, centred, for 800 ms or until a key. */
+    void showSplash();
     void drawMenu();
-    void drawTicker();
+    /** @brief The one-row announcement bar (events, errors, confirmations). */
+    void drawAnnounce();
     void drawPanes();
     void drawBody();
-    void drawStatus();
+    /** @brief The Instances screen: one train per row with its mini route line. */
+    void drawInstances();
+    /** @brief The route preview of a definition: rows of ● stops with labels, @p width cells wide. */
+    std::vector<Line> routePreview(const std::string& industryId, const std::string& definition, int width) const;
+    /** @brief The key hints. */
+    void drawFooter();
+    /** @brief The list window of the current screen (dashboard or page). */
+    WINDOW* listWindow() const;
+    /** @brief The detail window of the current screen (dashboard or page). */
+    WINDOW* detailWindow() const;
 
     InterfaceController& controller_;
     LineInterpreter interpreter_;
@@ -143,6 +201,13 @@ private:
     std::vector<std::string> overdue_;
 
     bool running_;
+
+    bool pending_;            ///< a Reject or Cancel waits for its confirming key
+    int pendingKey_;
+    WorkAction pendingAction_;
+    std::string pendingItem_;
+
+    mutable std::map<std::string, std::vector<RouteStop> > routeMaps_;
 };
 
 } // namespace ui

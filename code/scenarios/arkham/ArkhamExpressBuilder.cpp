@@ -33,6 +33,10 @@ void ArkhamExpressBuilder::buildRules() {
     buildEndOutcome("CancelOrder", "cancelled");
     buildEndOutcome("ReturnToWarehouse", "returned");
     buildEndOutcome("CloseOrder", "succeeded");
+    // Route map for the interface: where each exception branch leaves the main line.
+    buildExceptionRoute("ValidateOrder", {"CancelOrder"});
+    buildExceptionRoute("RequestStock", {"HandleStockFailure"});
+    buildExceptionRoute("Deliver", {"ReturnToWarehouse"});
     buildAssignmentRule(std::unique_ptr<AssignmentRule>(new WorkloadBasedAssignment()));
     buildPath("ReceiveOrder", "ValidateOrder");
     buildBranch("ValidateOrder", RoutingCondition::equals("orderValid", "yes"), {"CheckStock"});

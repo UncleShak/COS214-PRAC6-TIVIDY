@@ -28,6 +28,8 @@ public:
     ~RealEngine() override;
 
     std::vector<IndustryInfo> listIndustries() const override;
+    std::vector<RouteStop> routeMap(const std::string& industryId,
+                                    const std::string& definitionName) const override;
     std::vector<DataField> startFields(const std::string& industryId, const std::string& definitionName) const override;
     std::string startInstance(const std::string& industryId, const std::string& definitionName,
                               const std::map<std::string, std::string>& initialData) override;
