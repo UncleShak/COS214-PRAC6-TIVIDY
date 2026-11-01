@@ -117,6 +117,14 @@ void WorkflowInstance::start() {
 }
 
 bool WorkflowInstance::isStarted() const { return started; }
+std::string WorkflowInstance::getOutcome() const {
+    if (!isComplete()) return "running";
+    // Definition order gives exception outcomes priority over normal endings.
+    for (const auto& end : definition->getEndOutcomes())
+        if (tracker->isCompleted(end.item)) return end.outcome;
+    return "stopped";
+}
+
 bool WorkflowInstance::isComplete() const { return started && tracker->isComplete(); }
 bool WorkflowInstance::isStalled() const { return started && tracker->isStalled(); }
 
@@ -161,6 +169,16 @@ void WorkflowInstance::beginAction() {
 
 // Turns the tracker's routing result into WorkItem state changes.
 void WorkflowInstance::apply(const ProgressionResult& result) {
+    for (const std::string& name : result.dropped) {
+        WorkItem* item = getItem(name);
+        // Waiting dependants have never become available; cancel them at instance level.
+        if (item->getCurrentState()->getStateName() == "Created")
+            item->restoreState(createWorkItemState("Cancelled"), nullptr);
+        else if (isOpen(item->getCurrentState()->getStateName()))
+            runCommand(new CancelCommand(item, &system));
+        if (approvalDesk) approvalDesk->cancelPending(name, "Prerequisite cannot complete");
+        history.record("Cancelled unreachable item " + name);
+    }
     for (std::size_t i = 0; i < result.reopened.size(); ++i) getItem(result.reopened[i])->reopen();
     for (std::size_t i = 0; i < result.madeAvailable.size(); ++i) open(result.madeAvailable[i]);
     if (!result.decision.description.empty()) history.record("Routing: " + result.decision.description);
@@ -276,7 +294,7 @@ void WorkflowInstance::cancelWork(const std::string& name, Participant* actor) {
     beginAction();
     WorkItem* item = getItem(name);
     runCommand(new CancelCommand(item, actor, guard(item, actor)));
-    tracker->cancel(name);
+    apply(tracker->cancel(name));
     const WorkflowDefinition::ConnectorBinding* binding = definition->getConnectorBinding(name);
     if (binding != nullptr) {
         std::unique_ptr<DataPayload> result = binding->connector->cancelExternal(*payload);

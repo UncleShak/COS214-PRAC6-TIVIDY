@@ -119,6 +119,7 @@ class WorkflowInstance : public EventSource, public EventListener {
         virtual void start();
         bool isStarted() const;
         bool isComplete() const;
+        std::string getOutcome() const;
         bool isStalled() const;
 
         // Work items

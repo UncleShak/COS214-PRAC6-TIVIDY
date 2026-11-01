@@ -19,6 +19,8 @@ class ScenarioBuilder;
 
 class WorkflowDefinition {
     public:
+        struct EndOutcome { std::string item; std::string outcome; };
+        const std::vector<EndOutcome>& getEndOutcomes() const;
         // Adapter binding: which external operation a work item calls
         struct ConnectorBinding {
             std::shared_ptr<Connector> connector;
@@ -51,6 +53,7 @@ class WorkflowDefinition {
     private:
         WorkflowComponent* rootStage;
         std::string definitionVersion;
+        std::vector<EndOutcome> endOutcomes;
         std::string identityField; // Bound to the runtime ID; never editable.
         std::set<std::string> cancellationItems;
 

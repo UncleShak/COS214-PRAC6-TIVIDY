@@ -28,6 +28,9 @@ void ArkhamExpressBuilder::buildRules() {
     buildEntry("ReceiveOrder");
     buildIdentityField("orderId");
     buildCancellationItem("CancelOrder");
+    buildEndOutcome("CancelOrder", "cancelled");
+    buildEndOutcome("ReturnToWarehouse", "returned");
+    buildEndOutcome("CloseOrder", "succeeded");
     buildAssignmentRule(std::unique_ptr<AssignmentRule>(new WorkloadBasedAssignment()));
     buildPath("ReceiveOrder", "ValidateOrder");
     buildBranch("ValidateOrder", RoutingCondition::equals("orderValid", "yes"), {"CheckStock"});
