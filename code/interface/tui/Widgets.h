@@ -34,11 +34,19 @@ struct Line {
     Line(const std::string& t, Tone c = Tone::Text) : text(t), tone(c) {}
 };
 
-/** @brief Writes @p text at (y, x), cut to fit the window width minus @p margin. */
+/** @brief Writes @p text (UTF-8) at (y, x), cut to fit the window width minus @p margin, in cells. */
 void putText(WINDOW* window, int y, int x, const std::string& text, Tone tone, int margin = 1);
 
-/** @brief Box with a slanted title tab; cyan border when the window has focus. */
-void drawFrame(WINDOW* window, const std::string& title, bool focused);
+/**
+ * @brief Rounded box (╭ ╮ ╰ ╯) with the title as a sign plate in the top edge, 2 columns in.
+ *        Focused: line-text border and a plate on the line colour. Otherwise: rule-grey
+ *        border and a plate on the band.
+ * @param right optional summary at the right of the top edge, e.g. "2 of 10 stops"
+ */
+void drawFrame(WINDOW* window, const std::string& title, bool focused, const std::string& right = "");
+
+/** @brief Fills @p width cells from (y, x) with spaces in @p tone (a bar or band). */
+void fillRow(WINDOW* window, int y, int x, int width, Tone tone);
 
 /** @brief Writes UTF-8 decoration (block and box characters) at (y, x) without cutting it. */
 void putGlyphs(WINDOW* window, int y, int x, const char* glyphs, Tone tone);
@@ -46,8 +54,14 @@ void putGlyphs(WINDOW* window, int y, int x, const char* glyphs, Tone tone);
 /** @brief One list row: a cyan selection bar with a pointer when @p chosen. */
 void putRow(WINDOW* window, int y, int x, int width, const std::string& text, Tone tone, bool chosen);
 
-/** @brief @p text cut or padded with spaces to exactly @p width characters. */
+/** @brief @p text cut or padded with spaces to exactly @p width terminal cells (UTF-8 aware). */
 std::string fit(const std::string& text, std::size_t width);
+
+/** @brief Terminal cells @p text takes: one per UTF-8 code point (box and geometric glyphs are narrow). */
+std::size_t cells(const std::string& text);
+
+/** @brief The first @p width cells of @p text, never splitting a UTF-8 sequence. */
+std::string cutCells(const std::string& text, std::size_t width);
 
 /** @brief True for the keys that mean "confirm" (Enter on every terminal). */
 bool isEnter(int key);

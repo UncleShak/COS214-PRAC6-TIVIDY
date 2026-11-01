@@ -5,8 +5,10 @@
 namespace tividy {
 namespace ui {
 
-Layout::Layout()
-    : title_(0), calendar_(0), menu_(0), list_(0), detail_(0), body_(0), ticker_(0), status_(0) {
+Layout::Layout() {
+    for (int i = 0; i < kWindowCount; ++i) {
+        windows_[i] = 0;
+    }
     rebuild();
 }
 
@@ -33,22 +35,20 @@ void Layout::rebuild() {
     if (geometry_.tooSmall) {
         return;
     }
-    title_ = open(geometry_.title);
-    calendar_ = open(geometry_.calendar);
-    menu_ = open(geometry_.menu);
-    list_ = open(geometry_.list);
-    detail_ = open(geometry_.detail);
-    body_ = open(geometry_.body);
-    ticker_ = open(geometry_.ticker);
-    status_ = open(geometry_.status);
+    const Rect rects[kWindowCount] = {geometry_.header, geometry_.route, geometry_.menu, geometry_.list,
+                                      geometry_.detail, geometry_.pageMenu, geometry_.pageList,
+                                      geometry_.pageDetail, geometry_.body, geometry_.announce,
+                                      geometry_.footer};
+    for (int i = 0; i < kWindowCount; ++i) {
+        windows_[i] = open(rects[i]);
+    }
 }
 
 void Layout::destroy() {
-    WINDOW** windows[] = {&title_, &calendar_, &menu_, &list_, &detail_, &body_, &ticker_, &status_};
-    for (int i = 0; i < 8; ++i) {
-        if (*windows[i] != 0) {
-            delwin(*windows[i]);
-            *windows[i] = 0;
+    for (int i = 0; i < kWindowCount; ++i) {
+        if (windows_[i] != 0) {
+            delwin(windows_[i]);
+            windows_[i] = 0;
         }
     }
 }

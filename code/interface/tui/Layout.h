@@ -3,8 +3,8 @@
  * @brief The ncurses windows of the front end, created from LayoutGeometry.
  *
  * Rebuilt from scratch on every terminal resize. Below the minimum size no windows exist
- * and the front end shows a "terminal too small" message instead. The menu window is null
- * when the terminal is too narrow for it (see Geometry::kMenuMinCols).
+ * and the front end shows a "make the window bigger" message instead. The dashboard and
+ * the other screens cover the same rows, so drawing either set repaints every cell.
  *
  * @author Shakir Alexander (Lust)
  */
@@ -33,31 +33,30 @@ public:
     bool tooSmall() const { return geometry_.tooSmall; }
     const Geometry& geometry() const { return geometry_; }
 
-    WINDOW* title() const { return title_; }
-    WINDOW* calendar() const { return calendar_; }
-    WINDOW* menu() const { return menu_; }
-    WINDOW* list() const { return list_; }
-    WINDOW* detail() const { return detail_; }
-    WINDOW* body() const { return body_; }
-    WINDOW* ticker() const { return ticker_; }
-    WINDOW* status() const { return status_; }
+    WINDOW* header() const { return windows_[kHeader]; }
+    WINDOW* route() const { return windows_[kRoute]; }
+    WINDOW* menu() const { return windows_[kMenu]; }
+    WINDOW* list() const { return windows_[kList]; }
+    WINDOW* detail() const { return windows_[kDetail]; }
+    WINDOW* pageMenu() const { return windows_[kPageMenu]; }
+    WINDOW* pageList() const { return windows_[kPageList]; }
+    WINDOW* pageDetail() const { return windows_[kPageDetail]; }
+    WINDOW* body() const { return windows_[kBody]; }
+    WINDOW* announce() const { return windows_[kAnnounce]; }
+    WINDOW* footer() const { return windows_[kFooter]; }
 
 private:
     Layout(const Layout&) = delete;
     Layout& operator=(const Layout&) = delete;
 
+    enum { kHeader, kRoute, kMenu, kList, kDetail, kPageMenu, kPageList, kPageDetail, kBody,
+           kAnnounce, kFooter, kWindowCount };
+
     void destroy();
     static WINDOW* open(const Rect& r);
 
     Geometry geometry_;
-    WINDOW* title_;
-    WINDOW* calendar_;
-    WINDOW* menu_;
-    WINDOW* list_;
-    WINDOW* detail_;
-    WINDOW* body_;
-    WINDOW* ticker_;
-    WINDOW* status_;
+    WINDOW* windows_[kWindowCount];
 };
 
 } // namespace ui

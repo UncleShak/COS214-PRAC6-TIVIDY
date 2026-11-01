@@ -40,14 +40,38 @@ int scrollTo(int selected, int top, int visible) {
 
 } // namespace
 
+std::size_t cells(const std::string& text) {
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if ((static_cast<unsigned char>(text[i]) & 0xC0) != 0x80) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+std::string cutCells(const std::string& text, std::size_t width) {
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if ((static_cast<unsigned char>(text[i]) & 0xC0) != 0x80) {
+            if (count == width) {
+                return text.substr(0, i);
+            }
+            ++count;
+        }
+    }
+    return text;
+}
+
 void putText(WINDOW* window, int y, int x, const std::string& text, Tone tone, int margin) {
     int width = getmaxx(window) - x - margin;
     if (width <= 0 || y < 0 || y >= getmaxy(window)) {
         return;
     }
+    const std::string shown = cutCells(text, static_cast<std::size_t>(width));
     int attr = Theme::attr(tone);
     wattron(window, attr);
-    mvwaddnstr(window, y, x, text.c_str(), width);
+    mvwaddstr(window, y, x, shown.c_str());
     wattroff(window, attr);
 }
 
@@ -61,32 +85,57 @@ void putGlyphs(WINDOW* window, int y, int x, const char* glyphs, Tone tone) {
     wattroff(window, attr);
 }
 
-void drawFrame(WINDOW* window, const std::string& title, bool focused) {
-    int border = Theme::attr(focused ? Tone::Line : Tone::Muted);
+namespace {
+
+#ifdef NCURSES_WIDECHAR
+/** One wide box-drawing character as a cchar_t, for wborder_set. */
+cchar_t boxChar(const wchar_t* glyph) {
+    cchar_t c;
+    setcchar(&c, glyph, A_NORMAL, 0, 0);
+    return c;
+}
+#endif
+
+} // namespace
+
+void drawFrame(WINDOW* window, const std::string& title, bool focused, const std::string& right) {
+    const int border = Theme::attr(focused ? Tone::BorderFocus : Tone::Border);
     wattron(window, border);
 #ifdef NCURSES_WIDECHAR
-    // Unicode box drawing (heavy when focused), not the terminal's line-drawing mode.
-    if (focused) {
-        wborder_set(window, WACS_T_VLINE, WACS_T_VLINE, WACS_T_HLINE, WACS_T_HLINE,
-                    WACS_T_ULCORNER, WACS_T_URCORNER, WACS_T_LLCORNER, WACS_T_LRCORNER);
-    } else {
-        wborder_set(window, WACS_VLINE, WACS_VLINE, WACS_HLINE, WACS_HLINE,
-                    WACS_ULCORNER, WACS_URCORNER, WACS_LLCORNER, WACS_LRCORNER);
-    }
+    const cchar_t vertical = boxChar(L"\u2502");
+    const cchar_t horizontal = boxChar(L"\u2500");
+    const cchar_t topLeft = boxChar(L"\u256D");
+    const cchar_t topRight = boxChar(L"\u256E");
+    const cchar_t bottomLeft = boxChar(L"\u2570");
+    const cchar_t bottomRight = boxChar(L"\u256F");
+    wborder_set(window, &vertical, &vertical, &horizontal, &horizontal, &topLeft, &topRight, &bottomLeft,
+                &bottomRight);
 #else
     box(window, 0, 0);
 #endif
     wattroff(window, border);
-    if (!title.empty()) {
-        // A slanted tab, like the Persona menu headers:  ◢ TITLE ◤
-        const std::string label = " " + title + " ";
-        const int room = getmaxx(window) - 7;
-        if (room > 4) {
-            putGlyphs(window, 0, 2, "\u25E2", focused ? Tone::Line : Tone::Muted);
-            putText(window, 0, 3, label.substr(0, static_cast<std::size_t>(room)), focused ? Tone::Plate : Tone::Band, 1);
-            const int end = 3 + static_cast<int>(std::min(label.size(), static_cast<std::size_t>(room)));
-            putGlyphs(window, 0, end, "\u25E4", focused ? Tone::Line : Tone::Muted);
+
+    const int width = getmaxx(window);
+    int plateEnd = 2;
+    if (!title.empty() && width > 8) {
+        const std::string plate = " " + title + " ";
+        const std::size_t room = static_cast<std::size_t>(width - 4);
+        const std::string shown = plate.substr(0, std::min(plate.size(), room));
+        putText(window, 0, 2, shown, focused ? Tone::Plate : Tone::PlateBand, 0);
+        plateEnd = 2 + static_cast<int>(shown.size());
+    }
+    if (!right.empty()) {
+        const std::string summary = " " + right + " ";
+        const int x = width - 2 - static_cast<int>(summary.size());
+        if (x > plateEnd + 1) {
+            putText(window, 0, x, summary, Tone::Muted, 0);
         }
+    }
+}
+
+void fillRow(WINDOW* window, int y, int x, int width, Tone tone) {
+    if (width > 0) {
+        putText(window, y, x, std::string(static_cast<std::size_t>(width), ' '), tone, 0);
     }
 }
 
@@ -103,10 +152,11 @@ void putRow(WINDOW* window, int y, int x, int width, const std::string& text, To
 }
 
 std::string fit(const std::string& text, std::size_t width) {
-    if (text.size() >= width) {
-        return text.substr(0, width);
+    const std::size_t used = cells(text);
+    if (used >= width) {
+        return cutCells(text, width);
     }
-    return text + std::string(width - text.size(), ' ');
+    return text + std::string(width - used, ' ');
 }
 
 bool isEnter(int key) {

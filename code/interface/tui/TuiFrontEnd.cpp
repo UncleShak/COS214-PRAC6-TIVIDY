@@ -254,7 +254,7 @@ void TuiFrontEnd::handleReports(int key) {
 }
 
 bool TuiFrontEnd::moveSelection(int key, int count) {
-    const int page = layout_.list() != 0 ? std::max(1, getmaxy(layout_.list()) - 2) : 10;
+    const int page = listWindow() != 0 ? std::max(1, getmaxy(listWindow()) - 2) : 10;
     int next = selected_;
     switch (key) {
     case KEY_UP:
@@ -1083,34 +1083,21 @@ std::string TuiFrontEnd::emptyListText() const {
     }
 }
 
-std::string TuiFrontEnd::breadcrumb() const {
+std::vector<std::string> TuiFrontEnd::breadcrumbs() const {
     const SessionView& view = controller_.view();
-    std::string path;
+    std::vector<std::string> path;
     if (screen_ != Screen::Industries) {
-        path += " > " + industryName();
+        path.push_back(industryName());
     }
     if (screen_ == Screen::Dashboard || screen_ == Screen::History || screen_ == Screen::Reports) {
-        path += " > " + view.instanceId + " (" + view.instance.definitionName + ")";
+        path.push_back(view.instanceId);
     }
     if (screen_ == Screen::History) {
-        path += " > History";
+        path.push_back("History");
     } else if (screen_ == Screen::Reports) {
-        path += " > Reports";
+        path.push_back("Reports");
     }
     return path;
-}
-
-std::string TuiFrontEnd::headerRight() const {
-    const SessionView& view = controller_.view();
-    std::string right;
-    if (screen_ != Screen::Industries) {
-        right += "t=" + number(view.clock) + "  ";
-        const std::string actor = controller_.participantName(view.actorId);
-        if (!actor.empty()) {
-            right += "as " + actor + "  ";
-        }
-    }
-    return right + "[" + engineLabel_ + "]";
 }
 
 std::string TuiFrontEnd::hints() const {
@@ -1123,8 +1110,7 @@ std::string TuiFrontEnd::hints() const {
         if (showPanel_) {
             return "Enter back to detail   (any other key also works)";
         }
-        return layout_.geometry().showMenu ? "Enter actions   v available/all   Tab detail   b back   ? help"
-                                           : "Enter act v avail a approve e event u undo h hist r rep p as t clock ? help";
+        return "Enter actions   v available/all   Tab detail   b back   ? help";
     case Screen::History:
         return "Up/Down scroll   o oldest/newest first   / filter   Esc clear filter   b back   ? help";
     case Screen::Reports:
@@ -1157,83 +1143,110 @@ void TuiFrontEnd::draw() {
         drawTooSmall();
         return;
     }
-    drawTitle();
-    drawCalendar();
+    drawHeader();
     drawMenu();
-    if (screen_ == Screen::History || screen_ == Screen::Reports) {
+    if (screen_ == Screen::Dashboard) {
+        drawRoute();
+        drawPanes();
+    } else if (screen_ == Screen::History || screen_ == Screen::Reports) {
         drawBody();
     } else {
         drawPanes();
     }
-    drawTicker();
-    drawStatus();
+    drawAnnounce();
+    drawFooter();
     doupdate();
+}
+
+WINDOW* TuiFrontEnd::listWindow() const {
+    return screen_ == Screen::Dashboard ? layout_.list() : layout_.pageList();
+}
+
+WINDOW* TuiFrontEnd::detailWindow() const {
+    return screen_ == Screen::Dashboard ? layout_.detail() : layout_.pageDetail();
 }
 
 void TuiFrontEnd::drawTooSmall() {
     Theme::paint(stdscr);
     erase();
-    char size[96];
-    std::snprintf(size, sizeof(size), "Terminal is %dx%d. TIVIDY needs at least %dx%d.", COLS, LINES,
-                  Layout::kMinCols, Layout::kMinRows);
-    putText(stdscr, 1, 1, size, Tone::Red);
-    putText(stdscr, 3, 1, "Enlarge the window, or run:  tividy --plain", Tone::Text);
-    putText(stdscr, 5, 1, "q quits", Tone::Muted);
+    char message[64];
+    std::snprintf(message, sizeof(message), "Make the window at least %d \u00D7 %d", Layout::kMinCols,
+                  Layout::kMinRows);
+    const int width = static_cast<int>(cells(message));
+    putGlyphs(stdscr, LINES / 2, std::max(0, (COLS - width) / 2), message, Tone::Text);
     wnoutrefresh(stdscr);
     doupdate();
 }
 
-void TuiFrontEnd::drawTitle() {
-    WINDOW* w = layout_.title();
+void TuiFrontEnd::drawHeader() {
+    const SessionView& view = controller_.view();
+    WINDOW* w = layout_.header();
     werase(w);
-    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Plate, 0);
-    putText(w, 0, 1, "TIVIDY", Tone::Plate, 0);
-    putGlyphs(w, 0, 8, "\u25C6", Tone::Plate);
-    const std::string label = "[" + engineLabel_ + "]";
-    const int labelWidth = static_cast<int>(label.size()) + 2;
-    const std::string path = screen_ == Screen::Industries ? " Se7en workflow engine" : breadcrumb();
-    putText(w, 0, 10, path, Tone::Plate, labelWidth + 2);
-    putText(w, 0, std::max(10, COLS - labelWidth), label, Tone::Plate, 0);
+    fillRow(w, 0, 0, COLS, Tone::Band);
+    fillRow(w, 1, 0, COLS, Tone::Band);
+
+    // Row 1, right: every industry's route bullet and name; the active one bright.
+    const int active = lineIndustry();
+    int right = COLS - 1;
+    for (int i = static_cast<int>(view.industries.size()) - 1; i >= 0; --i) {
+        const std::string name = view.industries[i].displayName;
+        right -= static_cast<int>(name.size());
+        putText(w, 0, right, name, i == active ? Tone::BandBright : Tone::BandMuted, 0);
+        right -= 4;
+        putText(w, 0, right, " " + number(i + 1) + " ", i == active ? Theme::industryBullet(i) : Tone::KeyMuted, 0);
+        right -= 3;
+    }
+
+    // Row 1, left: the active line's bullet, TIVIDY, then the breadcrumbs.
+    putText(w, 0, 1, " " + number(active + 1) + " ", Theme::industryBullet(active), 0);
+    putText(w, 0, 5, "TIVIDY", Tone::BandBright, 0);
+    int x = 11;
+    const std::vector<std::string> crumbs = breadcrumbs();
+    for (std::size_t i = 0; i < crumbs.size() && x < right - 4; ++i) {
+        putGlyphs(w, 0, x + 1, "\u203A", Tone::BandMuted);
+        putText(w, 0, x + 3, crumbs[i], Tone::Band, COLS - right + 2);
+        x += 3 + static_cast<int>(cells(crumbs[i]));
+    }
+
+    // Row 2: context in grey, the engine label (and what undo would reverse) on the right.
+    std::string context = "t=" + number(view.clock);
+    if (!view.instanceId.empty()) {
+        context += "   \u00B7   " + view.instanceId + " " + instanceStatus(view.instance);
+    } else if (!view.industryId.empty()) {
+        context += "   \u00B7   " + industryName();
+    }
+    const std::string actor = controller_.participantName(view.actorId);
+    if (!actor.empty()) {
+        std::string roles;
+        for (std::size_t i = 0; i < view.participants.size(); ++i) {
+            if (view.participants[i].id == view.actorId) {
+                roles = join(view.participants[i].roles, ", ");
+            }
+        }
+        context += "   \u00B7   acting as " + actor + (roles.empty() ? "" : " (" + roles + ")");
+    }
+    const std::string next = screen_ == Screen::Dashboard ? controller_.nextUndo() : "";
+    const std::string label = (next.empty() ? "" : "u undo " + next + "   ") + "[" + engineLabel_ + "]";
+    const int labelX = std::max(COLS / 2, COLS - 1 - static_cast<int>(label.size()));
+    putText(w, 1, 1, cutCells(context, static_cast<std::size_t>(labelX - 3)), Tone::BandMuted, 0);
+    putText(w, 1, labelX, label, Tone::BandMuted, 1);
     touchwin(w);
     wnoutrefresh(w);
 }
 
-void TuiFrontEnd::drawCalendar() {
-    // The Persona calendar strip: the day (engine clock), where you are and who you are.
+void TuiFrontEnd::drawRoute() {
     const SessionView& view = controller_.view();
-    WINDOW* w = layout_.calendar();
+    WINDOW* w = layout_.route();
     werase(w);
-    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Band, 0);
-    putGlyphs(w, 0, 0, "\u25E4", Tone::Line);
-    std::string strip = "  t=" + number(view.clock);
-    if (!view.industryId.empty()) {
-        strip += "   |   " + industryName();
-    }
-    if (!view.instanceId.empty()) {
-        strip += "   |   " + view.instanceId + "  " + instanceStatus(view.instance);
-    }
-    const std::string actor = controller_.participantName(view.actorId);
-    if (!actor.empty()) {
-        strip += "   |   acting as " + actor;
-    }
-    const std::string next = screen_ == Screen::Dashboard ? controller_.nextUndo() : "";
-    const std::string undoText = next.empty() ? "" : "u: undo " + next + " ";
-    // The undo hint keeps its place on the right; the strip is cut to fit beside it.
-    const int undoWidth = std::min(static_cast<int>(undoText.size()), COLS / 3);
-    putText(w, 0, 1, strip, Tone::Band, undoWidth + 1);
-    if (!undoText.empty()) {
-        putText(w, 0, COLS - undoWidth, undoText, Tone::Band, 0);
-    }
+    drawFrame(w, "ROUTE \u00B7 " + view.instanceId, false);
     touchwin(w);
     wnoutrefresh(w);
 }
 
 void TuiFrontEnd::drawMenu() {
-    WINDOW* w = layout_.menu();
-    if (w == 0) {
-        return;
-    }
+    WINDOW* w = screen_ == Screen::Dashboard ? layout_.menu() : layout_.pageMenu();
     werase(w);
+    drawFrame(w, "MENU", false);
     const bool inInstance = !controller_.view().instanceId.empty();
     const bool inIndustry = !controller_.view().industryId.empty();
     struct Entry { const char* label; const char* key; bool screen; Screen target; bool enabled; };
@@ -1258,17 +1271,14 @@ void TuiFrontEnd::drawMenu() {
     for (std::size_t i = 0; i < sizeof(entries) / sizeof(entries[0]) && y < getmaxy(w) - 1; ++i, ++y) {
         const Entry& e = entries[i];
         if (e.label[0] == '\0') {
-            putText(w, y, 2, std::string(static_cast<std::size_t>(width - 4), '-'), Tone::Muted, 0);
+            putText(w, y, 2, std::string(static_cast<std::size_t>(width - 4), '-'), Tone::Dim, 0);
             continue;
         }
         const bool current = e.screen && e.target == screen_;
-        // The current screen pops out as a cyan bar with a slanted end, like the P3R menu.
-        const std::string label = std::string(e.label);
         if (current) {
-            putText(w, y, 1, fit(" " + label, static_cast<std::size_t>(width - 3)), Tone::Select, 0);
-            putGlyphs(w, y, width - 2, "\u25E4", Tone::Line);
+            putText(w, y, 1, fit(" " + std::string(e.label), static_cast<std::size_t>(width - 2)), Tone::Select, 0);
         } else {
-            putText(w, y, 3, label, e.enabled ? Tone::Text : Tone::Muted, 0);
+            putText(w, y, 2, e.label, e.enabled ? Tone::Text : Tone::Dim, 0);
         }
         if (e.key[0] != '\0') {
             putText(w, y, width - 4, e.key, current ? Tone::Select : Tone::Muted, 0);
@@ -1278,27 +1288,33 @@ void TuiFrontEnd::drawMenu() {
     wnoutrefresh(w);
 }
 
-void TuiFrontEnd::drawTicker() {
-    // Live feed: the newest history entry of the open instance (Observer events land here).
-    WINDOW* w = layout_.ticker();
+void TuiFrontEnd::drawAnnounce() {
+    WINDOW* w = layout_.announce();
     werase(w);
-    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Band, 0);
-    putText(w, 0, 1, " LIVE ", Tone::BulletRed, 0);
-    std::string latest = "Choose an industry and an instance to see its events here.";
-    if (!controller_.view().instanceId.empty()) {
+    fillRow(w, 0, 0, COLS, Tone::Band);
+    std::string text = "Choose a line to see its trains.";
+    Tone tone = Tone::Band;
+    if (status_.kind == StatusMessage::Kind::Error) {
+        text = status_.text;
+        tone = Tone::BandRed;
+    } else if (!status_.text.empty()) {
+        text = status_.text;
+    } else if (!controller_.view().instanceId.empty()) {
         std::vector<std::string> lines;
         controller_.history(lines, true, "");
-        latest = lines.empty() ? "No events yet." : lines.front();
+        text = lines.empty() ? "No events yet." : lines.front();
     }
-    putGlyphs(w, 0, 8, "\u25B6", Tone::Band);
-    putText(w, 0, 10, latest, Tone::Band, 1);
+    putGlyphs(w, 0, 1, "\u25B6", tone == Tone::BandRed ? Tone::BandRed : Tone::BandBright);
+    const std::string clock = "t=" + number(controller_.view().clock);
+    putText(w, 0, 3, text, tone, static_cast<int>(clock.size()) + 3);
+    putText(w, 0, COLS - 1 - static_cast<int>(clock.size()), clock, Tone::BandMuted, 0);
     touchwin(w);
     wnoutrefresh(w);
 }
 
 void TuiFrontEnd::drawPanes() {
     // list
-    WINDOW* list = layout_.list();
+    WINDOW* list = listWindow();
     werase(list);
     drawFrame(list, listTitle(), focus_ == Pane::List);
     const int width = getmaxx(list) - 4;
@@ -1336,7 +1352,7 @@ void TuiFrontEnd::drawPanes() {
     wnoutrefresh(list);
 
     // detail
-    WINDOW* detail = layout_.detail();
+    WINDOW* detail = detailWindow();
     werase(detail);
     std::string title = "DETAIL";
     if (screen_ == Screen::Industries) {
@@ -1401,23 +1417,10 @@ void TuiFrontEnd::drawBody() {
     wnoutrefresh(w);
 }
 
-void TuiFrontEnd::drawStatus() {
-    WINDOW* w = layout_.status();
+void TuiFrontEnd::drawFooter() {
+    WINDOW* w = layout_.footer();
     werase(w);
     putText(w, 0, 1, hints(), Tone::Muted, 0);
-
-    Tone tone = Tone::Text;
-    std::string prefix;
-    if (status_.kind == StatusMessage::Kind::Error) {
-        tone = Tone::Red;
-        prefix = "! ";
-    } else if (status_.kind == StatusMessage::Kind::Success) {
-        tone = Tone::Line;
-        prefix = "+ ";
-    }
-    if (!status_.text.empty()) {
-        putText(w, 1, 1, prefix + status_.text, tone, 0);
-    }
     touchwin(w);
     wnoutrefresh(w);
 }

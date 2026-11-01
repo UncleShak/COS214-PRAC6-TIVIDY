@@ -100,22 +100,31 @@ private:
     std::vector<Line> bodyLines() const;
     std::string listTitle() const;
     std::string emptyListText() const;
-    std::string breadcrumb() const;
-    std::string headerRight() const;
+    /** @brief Header breadcrumbs after TIVIDY: industry, instance, screen. */
+    std::vector<std::string> breadcrumbs() const;
     std::string hints() const;
 
     // ---- drawing
     /** @brief Index of the industry whose line colour is shown (the cursor's, on the Industries screen). */
     int lineIndustry() const;
     void draw();
+    /** @brief Only a centred "make the window bigger" message. */
     void drawTooSmall();
-    void drawTitle();
-    void drawCalendar();
+    /** @brief Two-row band: route bullet, TIVIDY and breadcrumbs, industry bullets; then context. */
+    void drawHeader();
+    /** @brief The full-width route box at the top of the dashboard. */
+    void drawRoute();
     void drawMenu();
-    void drawTicker();
+    /** @brief The one-row announcement bar (events, errors, confirmations). */
+    void drawAnnounce();
     void drawPanes();
     void drawBody();
-    void drawStatus();
+    /** @brief The key hints. */
+    void drawFooter();
+    /** @brief The list window of the current screen (dashboard or page). */
+    WINDOW* listWindow() const;
+    /** @brief The detail window of the current screen (dashboard or page). */
+    WINDOW* detailWindow() const;
 
     InterfaceController& controller_;
     LineInterpreter interpreter_;
