@@ -105,6 +105,8 @@ private:
     std::string hints() const;
 
     // ---- drawing
+    /** @brief Index of the industry whose line colour is shown (the cursor's, on the Industries screen). */
+    int lineIndustry() const;
     void draw();
     void drawTooSmall();
     void drawTitle();

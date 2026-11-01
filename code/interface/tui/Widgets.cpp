@@ -62,7 +62,7 @@ void putGlyphs(WINDOW* window, int y, int x, const char* glyphs, Tone tone) {
 }
 
 void drawFrame(WINDOW* window, const std::string& title, bool focused) {
-    int border = Theme::attr(focused ? Tone::Gold : Tone::Muted);
+    int border = Theme::attr(focused ? Tone::Line : Tone::Muted);
     wattron(window, border);
 #ifdef NCURSES_WIDECHAR
     // Unicode box drawing (heavy when focused), not the terminal's line-drawing mode.
@@ -82,10 +82,10 @@ void drawFrame(WINDOW* window, const std::string& title, bool focused) {
         const std::string label = " " + title + " ";
         const int room = getmaxx(window) - 7;
         if (room > 4) {
-            putGlyphs(window, 0, 2, "\u25E2", focused ? Tone::Gold : Tone::Muted);
-            putText(window, 0, 3, label.substr(0, static_cast<std::size_t>(room)), focused ? Tone::Title : Tone::Strip, 1);
+            putGlyphs(window, 0, 2, "\u25E2", focused ? Tone::Line : Tone::Muted);
+            putText(window, 0, 3, label.substr(0, static_cast<std::size_t>(room)), focused ? Tone::Plate : Tone::Band, 1);
             const int end = 3 + static_cast<int>(std::min(label.size(), static_cast<std::size_t>(room)));
-            putGlyphs(window, 0, end, "\u25E4", focused ? Tone::Gold : Tone::Muted);
+            putGlyphs(window, 0, end, "\u25E4", focused ? Tone::Line : Tone::Muted);
         }
     }
 }
@@ -187,11 +187,11 @@ bool Dialog::prompt(const std::string& title, const std::string& label, std::str
     for (;;) {
         werase(w);
         drawFrame(w, title, true);
-        putText(w, 1, 2, label, Tone::Bone, 2);
+        putText(w, 1, 2, label, Tone::Text, 2);
         const std::size_t room = static_cast<std::size_t>(std::max(1, getmaxx(w) - 8));
         const std::string shown = tail(typed, room);
-        putText(w, 3, 2, "> ", Tone::Gold, 2);
-        putText(w, 3, 4, shown, Tone::Bone, 2);
+        putText(w, 3, 2, "> ", Tone::Line, 2);
+        putText(w, 3, 4, shown, Tone::Text, 2);
         putText(w, 5, 2, "Enter confirm   Esc cancel", Tone::Muted, 2);
         wmove(w, 3, 4 + static_cast<int>(shown.size()));
 
@@ -227,7 +227,7 @@ bool Dialog::confirm(const std::string& question) {
     for (;;) {
         werase(w);
         drawFrame(w, "CONFIRM", true);
-        putText(w, 1, 2, question, Tone::Bone, 2);
+        putText(w, 1, 2, question, Tone::Text, 2);
         putText(w, 3, 2, "Enter/y yes   Esc/n no", Tone::Muted, 2);
 
         const int key = wgetch(w);
@@ -310,7 +310,7 @@ void Dialog::alert(const std::string& title, const std::string& subtitle, const 
     const int band = std::max(1, LINES / 2 - 4);
     putGlyphs(w, band - 2, 0, stripes.c_str(), Tone::Red);
     for (int row = band; row < band + 5; ++row) {
-        putText(w, row, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Banner, 0);
+        putText(w, row, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::BulletRed, 0);
     }
     std::string spaced;
     for (std::size_t i = 0; i < title.size(); ++i) {
@@ -318,8 +318,8 @@ void Dialog::alert(const std::string& title, const std::string& subtitle, const 
         spaced += ' ';
     }
     const std::string heading = "!  " + spaced + " !";
-    putText(w, band + 1, std::max(0, (COLS - static_cast<int>(heading.size())) / 2), heading, Tone::Banner, 0);
-    putText(w, band + 3, std::max(0, (COLS - static_cast<int>(subtitle.size())) / 2), subtitle, Tone::Banner, 0);
+    putText(w, band + 1, std::max(0, (COLS - static_cast<int>(heading.size())) / 2), heading, Tone::BulletRed, 0);
+    putText(w, band + 3, std::max(0, (COLS - static_cast<int>(subtitle.size())) / 2), subtitle, Tone::BulletRed, 0);
     putGlyphs(w, band + 6, 0, stripes.c_str(), Tone::Red);
 
     int y = band + 8;
@@ -379,16 +379,16 @@ bool Dialog::form(const std::string& title, const std::vector<DataField>& fields
         for (int i = 0; i < count; ++i) {
             const int y = 2 + 2 * i;
             const bool focused = i == current;
-            putText(w, y, 2, labels[i], focused ? Tone::Gold : Tone::Bone, 2);
+            putText(w, y, 2, labels[i], focused ? Tone::Line : Tone::Text, 2);
             std::string inside = tail(typed[i], room);
-            Tone tone = Tone::Bone;
+            Tone tone = Tone::Text;
             if (inside.empty() && !focused && !fields[i].defaultValue.empty()) {
                 inside = "default: " + fields[i].defaultValue;
                 tone = Tone::Muted;
             }
-            putText(w, y, inputX, "[", focused ? Tone::Gold : Tone::Muted, 1);
+            putText(w, y, inputX, "[", focused ? Tone::Line : Tone::Muted, 1);
             putText(w, y, inputX + 1, fit(inside, room), tone, 1);
-            putText(w, y, inputX + 1 + static_cast<int>(room), "]", focused ? Tone::Gold : Tone::Muted, 1);
+            putText(w, y, inputX + 1 + static_cast<int>(room), "]", focused ? Tone::Line : Tone::Muted, 1);
         }
         if (!error.empty()) {
             putText(w, 2 * count + 2, 2, "! " + error, Tone::Red, 2);

@@ -54,7 +54,7 @@ Tone instanceTone(const InstanceView& instance) {
     if (instance.complete) {
         return Tone::Muted;
     }
-    return instance.stalled ? Tone::Red : Tone::Gold;
+    return instance.stalled ? Tone::Red : Tone::Line;
 }
 
 bool isFinal(const std::string& state) {
@@ -471,10 +471,10 @@ void TuiFrontEnd::actionMenu() {
         draw();
         const std::vector<ParticipantView>& people = controller_.view().participants;
         std::vector<Line> choices;
-        choices.push_back(Line("Auto (the industry's assignment rule chooses)", Tone::Gold));
+        choices.push_back(Line("Auto (the industry's assignment rule chooses)", Tone::Line));
         for (std::size_t i = 0; i < people.size(); ++i) {
             const bool fits = item.requiredRole.empty() || hasRole(people[i], item.requiredRole);
-            choices.push_back(Line(describePerson(people[i]), fits ? Tone::Bone : Tone::Muted));
+            choices.push_back(Line(describePerson(people[i]), fits ? Tone::Text : Tone::Muted));
         }
         const int who = Dialog::menu("ASSIGN '" + item.name + "' (needs " + orDash(item.requiredRole) + ")", choices);
         if (who == Dialog::kCancelled) {
@@ -519,14 +519,14 @@ void TuiFrontEnd::approvalsMenu() {
         if (!a.decidedBy.empty()) {
             text += "  (by " + a.decidedBy + (a.reason.empty() ? "" : ": " + a.reason) + ")";
         }
-        entries.push_back(Line(text, a.status == "Pending" ? Tone::Gold : Tone::Muted));
+        entries.push_back(Line(text, a.status == "Pending" ? Tone::Line : Tone::Muted));
     }
     const int pick = Dialog::menu("APPROVALS", entries);
     if (pick == Dialog::kCancelled) {
         return;
     }
     const ApprovalView approval = approvals[pick];
-    const Tone tone = approval.status == "Pending" ? Tone::Bone : Tone::Muted;
+    const Tone tone = approval.status == "Pending" ? Tone::Text : Tone::Muted;
 
     draw();
     std::vector<Line> choices;
@@ -571,7 +571,7 @@ void TuiFrontEnd::advanceClock() {
         return;
     }
     std::vector<Line> lines;
-    lines.push_back(Line(status_.text, Tone::Gold));
+    lines.push_back(Line(status_.text, Tone::Line));
     lines.push_back(Line());
     for (std::size_t i = 0; i < changes.size(); ++i) {
         lines.push_back(Line(changes[i], Tone::Red));
@@ -617,7 +617,7 @@ void TuiFrontEnd::raiseEvent() {
     std::vector<Line> lines;
     for (std::size_t i = 0; i < changes.size(); ++i) {
         const bool cancelled = changes[i].find("Cancelled") != std::string::npos;
-        lines.push_back(Line((cancelled ? "x  " : "+  ") + changes[i], cancelled ? Tone::Red : Tone::Gold));
+        lines.push_back(Line((cancelled ? "x  " : "+  ") + changes[i], cancelled ? Tone::Red : Tone::Line));
     }
     if (lines.empty()) {
         lines.push_back(Line("Nothing changed: no open work reacts to this event.", Tone::Muted));
@@ -670,7 +670,7 @@ void TuiFrontEnd::runCommand() {
 
 void TuiFrontEnd::showHelp() {
     std::vector<Line> lines;
-    lines.push_back(Line("Everywhere", Tone::Gold));
+    lines.push_back(Line("Everywhere", Tone::Line));
     lines.push_back(Line("  Up/Down or j/k   move              PgUp/PgDn, Home/End   jump"));
     lines.push_back(Line("  Enter            open or choose    b, Esc, Left          back"));
     lines.push_back(Line("  :                type a command (the same commands as tividy --plain)"));
@@ -680,11 +680,11 @@ void TuiFrontEnd::showHelp() {
 
     switch (screen_) {
     case Screen::Industries:
-        lines.push_back(Line("Industries", Tone::Gold));
+        lines.push_back(Line("Industries", Tone::Line));
         lines.push_back(Line("  Enter            work in the selected industry"));
         break;
     case Screen::Instances:
-        lines.push_back(Line("Instances", Tone::Gold));
+        lines.push_back(Line("Instances", Tone::Line));
         lines.push_back(Line("  Enter            open the selected instance"));
         lines.push_back(Line("  n                start a new instance (asks for its start data)"));
         lines.push_back(Line("  p                choose who you are acting as"));
@@ -692,7 +692,7 @@ void TuiFrontEnd::showHelp() {
         lines.push_back(Line("  i                change industry"));
         break;
     case Screen::Dashboard:
-        lines.push_back(Line("Instance dashboard", Tone::Gold));
+        lines.push_back(Line("Instance dashboard", Tone::Line));
         lines.push_back(Line("  Enter            actions on the selected work item"));
         lines.push_back(Line("                   (muted actions would be refused; you can still try them)"));
         lines.push_back(Line("  v                all work items / available work only"));
@@ -705,17 +705,17 @@ void TuiFrontEnd::showHelp() {
         lines.push_back(Line("  u                undo the last action in this instance"));
         lines.push_back(Line("  Tab              switch between the list and the detail pane"));
         lines.push_back(Line());
-        lines.push_back(Line("Colours: cyan = active work, steel = done or waiting, red = rejected,", Tone::Muted));
-        lines.push_back(Line("cancelled, escalated or an error. The cyan bar is the selection.", Tone::Muted));
+        lines.push_back(Line("Colours: line colour = started, purple = assigned, green = complete,", Tone::Muted));
+        lines.push_back(Line("yellow block = escalated, red = rejected or an error, grey = not reached.", Tone::Muted));
         break;
     case Screen::History:
-        lines.push_back(Line("History", Tone::Gold));
+        lines.push_back(Line("History", Tone::Line));
         lines.push_back(Line("  o                oldest first / newest first"));
         lines.push_back(Line("  /                show only entries containing some text"));
         lines.push_back(Line("  Esc              clear the filter (or go back if there is none)"));
         break;
     case Screen::Reports:
-        lines.push_back(Line("Reports", Tone::Gold));
+        lines.push_back(Line("Reports", Tone::Line));
         lines.push_back(Line("  Left/Right, Tab  Progress, Audit, Overdue"));
         lines.push_back(Line("  r                reload the reports"));
         break;
@@ -746,14 +746,14 @@ void TuiFrontEnd::showOutcome() {
     const ActionOutcome& outcome = controller_.lastOutcome();
     panelTitle_ = "RESULT";
     panel_.clear();
-    panel_.push_back(Line(outcome.commandDescription, Tone::Gold));
+    panel_.push_back(Line(outcome.commandDescription, Tone::Line));
     panel_.push_back(Line());
     if (!outcome.previousState.empty() || !outcome.newState.empty()) {
         panel_.push_back(Line("State:          " + orDash(outcome.previousState) + " -> " + orDash(outcome.newState),
                               Theme::forState(outcome.newState, "")));
     }
     if (!outcome.routingDescription.empty()) {
-        panel_.push_back(Line("Routing:        " + outcome.routingDescription, Tone::Gold));
+        panel_.push_back(Line("Routing:        " + outcome.routingDescription, Tone::Line));
     }
     if (!outcome.madeAvailable.empty()) {
         panel_.push_back(Line("Now available:  " + join(outcome.madeAvailable, ", ")));
@@ -766,7 +766,7 @@ void TuiFrontEnd::showOutcome() {
     }
     if (outcome.instanceComplete) {
         panel_.push_back(Line());
-        panel_.push_back(Line("The instance is complete.", Tone::Gold));
+        panel_.push_back(Line("The instance is complete.", Tone::Line));
     }
     panel_.push_back(Line());
     panel_.push_back(Line("Enter: back to the work item", Tone::Muted));
@@ -888,7 +888,7 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
     if (screen_ == Screen::Industries) {
         if (selected_ < static_cast<int>(view.industries.size())) {
             const IndustryInfo& industry = view.industries[selected_];
-            lines.push_back(Line(industry.displayName, Tone::Gold));
+            lines.push_back(Line(industry.displayName, Tone::Line));
             lines.push_back(Line(industry.description));
             lines.push_back(Line());
             lines.push_back(Line("Workflow definitions:", Tone::Muted));
@@ -904,7 +904,7 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
     if (screen_ == Screen::Instances) {
         if (selected_ < static_cast<int>(view.instances.size())) {
             const InstanceView& instance = view.instances[selected_];
-            lines.push_back(Line(instance.id, Tone::Gold));
+            lines.push_back(Line(instance.id, Tone::Line));
             lines.push_back(Line());
             lines.push_back(Line("Workflow:    " + instance.definitionName +
                                  (instance.definitionVersion.empty() ? "" : "  v" + instance.definitionVersion)));
@@ -937,7 +937,7 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
         lines.push_back(Line(availableOnly_ ? "No work is available right now." : "This instance has no work items.",
                              Tone::Muted));
         if (view.instance.complete) {
-            lines.push_back(Line("The instance is complete.", Tone::Gold));
+            lines.push_back(Line("The instance is complete.", Tone::Line));
         } else if (view.instance.stalled) {
             lines.push_back(Line("The instance is stalled: nothing can move forward.", Tone::Red));
         }
@@ -948,7 +948,7 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
         return lines;
     }
 
-    lines.push_back(Line(item->name, Tone::Gold));
+    lines.push_back(Line(item->name, Tone::Line));
     lines.push_back(Line());
     lines.push_back(Line("State:        " + item->state, Theme::forState(item->state, item->trackerStatus)));
     lines.push_back(Line("Progress:     " + (item->trackerStatus.empty() ? std::string("not reached yet")
@@ -956,11 +956,11 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
     lines.push_back(Line("Role:         " + orDash(item->requiredRole)));
     lines.push_back(Line("Assignee:     " + orDash(item->assigneeName)));
     lines.push_back(Line("Waiting on:   " + orDash(join(item->waitingOn, ", ")),
-                         item->waitingOn.empty() ? Tone::Bone : Tone::Muted));
+                         item->waitingOn.empty() ? Tone::Text : Tone::Muted));
     if (item->dueAt >= 0) {
         const bool overdue = view.clock > item->dueAt && !isFinal(item->state);
         lines.push_back(Line("Due:          t=" + number(item->dueAt) + (overdue ? "  OVERDUE" : ""),
-                             overdue ? Tone::Red : Tone::Bone));
+                             overdue ? Tone::Red : Tone::Text));
     } else {
         lines.push_back(Line("Due:          -"));
     }
@@ -987,7 +987,7 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
             heading = true;
         }
         lines.push_back(Line("  " + fit(a.id, 8) + fit(a.status, 10) + a.summary + "  (needs " + a.approverRole + ")",
-                             a.status == "Pending" ? Tone::Gold : (a.status == "Rejected" ? Tone::Red : Tone::Muted)));
+                             a.status == "Pending" ? Tone::Line : (a.status == "Rejected" ? Tone::Red : Tone::Muted)));
     }
 
     lines.push_back(Line());
@@ -1135,7 +1135,24 @@ std::string TuiFrontEnd::hints() const {
 
 // ---- drawing ----------------------------------------------------------------------------
 
+int TuiFrontEnd::lineIndustry() const {
+    const SessionView& view = controller_.view();
+    if (screen_ == Screen::Industries) {
+        return selected_;
+    }
+    for (std::size_t i = 0; i < view.industries.size(); ++i) {
+        if (view.industries[i].id == view.industryId) {
+            return static_cast<int>(i);
+        }
+    }
+    return 0;
+}
+
 void TuiFrontEnd::draw() {
+    const int industry = lineIndustry();
+    if (industry != Theme::industry()) {
+        Theme::applyTheme(industry);
+    }
     if (layout_.tooSmall()) {
         drawTooSmall();
         return;
@@ -1160,7 +1177,7 @@ void TuiFrontEnd::drawTooSmall() {
     std::snprintf(size, sizeof(size), "Terminal is %dx%d. TIVIDY needs at least %dx%d.", COLS, LINES,
                   Layout::kMinCols, Layout::kMinRows);
     putText(stdscr, 1, 1, size, Tone::Red);
-    putText(stdscr, 3, 1, "Enlarge the window, or run:  tividy --plain", Tone::Bone);
+    putText(stdscr, 3, 1, "Enlarge the window, or run:  tividy --plain", Tone::Text);
     putText(stdscr, 5, 1, "q quits", Tone::Muted);
     wnoutrefresh(stdscr);
     doupdate();
@@ -1169,14 +1186,14 @@ void TuiFrontEnd::drawTooSmall() {
 void TuiFrontEnd::drawTitle() {
     WINDOW* w = layout_.title();
     werase(w);
-    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Title, 0);
-    putText(w, 0, 1, "TIVIDY", Tone::Title, 0);
-    putGlyphs(w, 0, 8, "\u25C6", Tone::Title);
+    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Plate, 0);
+    putText(w, 0, 1, "TIVIDY", Tone::Plate, 0);
+    putGlyphs(w, 0, 8, "\u25C6", Tone::Plate);
     const std::string label = "[" + engineLabel_ + "]";
     const int labelWidth = static_cast<int>(label.size()) + 2;
     const std::string path = screen_ == Screen::Industries ? " Se7en workflow engine" : breadcrumb();
-    putText(w, 0, 10, path, Tone::Title, labelWidth + 2);
-    putText(w, 0, std::max(10, COLS - labelWidth), label, Tone::Title, 0);
+    putText(w, 0, 10, path, Tone::Plate, labelWidth + 2);
+    putText(w, 0, std::max(10, COLS - labelWidth), label, Tone::Plate, 0);
     touchwin(w);
     wnoutrefresh(w);
 }
@@ -1186,8 +1203,8 @@ void TuiFrontEnd::drawCalendar() {
     const SessionView& view = controller_.view();
     WINDOW* w = layout_.calendar();
     werase(w);
-    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Strip, 0);
-    putGlyphs(w, 0, 0, "\u25E4", Tone::Gold);
+    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Band, 0);
+    putGlyphs(w, 0, 0, "\u25E4", Tone::Line);
     std::string strip = "  t=" + number(view.clock);
     if (!view.industryId.empty()) {
         strip += "   |   " + industryName();
@@ -1203,9 +1220,9 @@ void TuiFrontEnd::drawCalendar() {
     const std::string undoText = next.empty() ? "" : "u: undo " + next + " ";
     // The undo hint keeps its place on the right; the strip is cut to fit beside it.
     const int undoWidth = std::min(static_cast<int>(undoText.size()), COLS / 3);
-    putText(w, 0, 1, strip, Tone::Strip, undoWidth + 1);
+    putText(w, 0, 1, strip, Tone::Band, undoWidth + 1);
     if (!undoText.empty()) {
-        putText(w, 0, COLS - undoWidth, undoText, Tone::Strip, 0);
+        putText(w, 0, COLS - undoWidth, undoText, Tone::Band, 0);
     }
     touchwin(w);
     wnoutrefresh(w);
@@ -1249,9 +1266,9 @@ void TuiFrontEnd::drawMenu() {
         const std::string label = std::string(e.label);
         if (current) {
             putText(w, y, 1, fit(" " + label, static_cast<std::size_t>(width - 3)), Tone::Select, 0);
-            putGlyphs(w, y, width - 2, "\u25E4", Tone::Gold);
+            putGlyphs(w, y, width - 2, "\u25E4", Tone::Line);
         } else {
-            putText(w, y, 3, label, e.enabled ? Tone::Bone : Tone::Muted, 0);
+            putText(w, y, 3, label, e.enabled ? Tone::Text : Tone::Muted, 0);
         }
         if (e.key[0] != '\0') {
             putText(w, y, width - 4, e.key, current ? Tone::Select : Tone::Muted, 0);
@@ -1265,16 +1282,16 @@ void TuiFrontEnd::drawTicker() {
     // Live feed: the newest history entry of the open instance (Observer events land here).
     WINDOW* w = layout_.ticker();
     werase(w);
-    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Strip, 0);
-    putText(w, 0, 1, " LIVE ", Tone::Banner, 0);
+    putText(w, 0, 0, std::string(static_cast<std::size_t>(COLS), ' '), Tone::Band, 0);
+    putText(w, 0, 1, " LIVE ", Tone::BulletRed, 0);
     std::string latest = "Choose an industry and an instance to see its events here.";
     if (!controller_.view().instanceId.empty()) {
         std::vector<std::string> lines;
         controller_.history(lines, true, "");
         latest = lines.empty() ? "No events yet." : lines.front();
     }
-    putGlyphs(w, 0, 8, "\u25B6", Tone::Strip);
-    putText(w, 0, 10, latest, Tone::Strip, 1);
+    putGlyphs(w, 0, 8, "\u25B6", Tone::Band);
+    putText(w, 0, 10, latest, Tone::Band, 1);
     touchwin(w);
     wnoutrefresh(w);
 }
@@ -1303,8 +1320,8 @@ void TuiFrontEnd::drawPanes() {
         const int index = listTop_ + row;
         const bool chosen = index == selected_;
         if (chosen && focus_ != Pane::List) {
-            putRow(list, 1 + row, 2, width, rows[index].text, Tone::Gold, false);
-            putGlyphs(list, 1 + row, 2, "\u25B7", Tone::Gold);
+            putRow(list, 1 + row, 2, width, rows[index].text, Tone::Line, false);
+            putGlyphs(list, 1 + row, 2, "\u25B7", Tone::Line);
         } else {
             putRow(list, 1 + row, 2, width, rows[index].text, rows[index].tone, chosen);
         }
@@ -1360,7 +1377,7 @@ void TuiFrontEnd::drawBody() {
             const bool active = t == reportTab_;
             const std::string label = active ? std::string("[ ") + kReportTabs[t] + " ]"
                                              : std::string("  ") + kReportTabs[t] + "  ";
-            putText(w, 1, x, label, active ? Tone::Gold : Tone::Muted, 2);
+            putText(w, 1, x, label, active ? Tone::Line : Tone::Muted, 2);
             x += static_cast<int>(label.size()) + 2;
         }
         firstRow = 3;
@@ -1389,13 +1406,13 @@ void TuiFrontEnd::drawStatus() {
     werase(w);
     putText(w, 0, 1, hints(), Tone::Muted, 0);
 
-    Tone tone = Tone::Bone;
+    Tone tone = Tone::Text;
     std::string prefix;
     if (status_.kind == StatusMessage::Kind::Error) {
         tone = Tone::Red;
         prefix = "! ";
     } else if (status_.kind == StatusMessage::Kind::Success) {
-        tone = Tone::Gold;
+        tone = Tone::Line;
         prefix = "+ ";
     }
     if (!status_.text.empty()) {

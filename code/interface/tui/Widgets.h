@@ -30,8 +30,8 @@ struct Line {
     std::string text;
     Tone tone;
 
-    Line() : tone(Tone::Bone) {}
-    Line(const std::string& t, Tone c = Tone::Bone) : text(t), tone(c) {}
+    Line() : tone(Tone::Text) {}
+    Line(const std::string& t, Tone c = Tone::Text) : text(t), tone(c) {}
 };
 
 /** @brief Writes @p text at (y, x), cut to fit the window width minus @p margin. */
