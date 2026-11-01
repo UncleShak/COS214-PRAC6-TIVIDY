@@ -80,6 +80,22 @@ TEST_CASE("taking the exception route dims the main line after the split") {
     CHECK(r.done == 2);
 }
 
+TEST_CASE("a finished train: stops it never reached are not needed, and it has arrived") {
+    std::vector<WorkItemView> items;
+    items.push_back(item("ReceiveOrder", "Completed"));
+    items.push_back(item("ValidateOrder", "Rejected"));
+    items.push_back(item("CheckStock", "Created"));
+    items.push_back(item("CloseOrder", "Created"));
+    items.push_back(item("CancelOrder", "Completed"));
+    const RouteModel r = RouteModel::build(items, map(), true);
+    CHECK(r.branchTaken);
+    CHECK(r.arrived);
+    CHECK(r.currentStation() == 0);
+    CHECK(r.main[3].kind == Station::Kind::Skipped);
+    REQUIRE(r.lastReached() != 0);
+    CHECK(r.lastReached()->name == "CancelOrder");
+}
+
 TEST_CASE("no route map: every item is a main stop; a passed-by stop is skipped") {
     std::vector<WorkItemView> items;
     items.push_back(item("A", "Completed"));

@@ -78,7 +78,8 @@ std::string stationLabel(const std::string& name, const std::string& given) {
     return word.size() > 8 ? word.substr(0, 7) + "\u2026" : word;
 }
 
-RouteModel RouteModel::build(const std::vector<WorkItemView>& items, const std::vector<RouteStop>& map) {
+RouteModel RouteModel::build(const std::vector<WorkItemView>& items, const std::vector<RouteStop>& map,
+                             bool finished) {
     std::map<std::string, const RouteStop*> stops;
     for (std::size_t i = 0; i < map.size(); ++i) {
         stops[map[i].workItemId] = &map[i];
@@ -143,6 +144,16 @@ RouteModel RouteModel::build(const std::vector<WorkItemView>& items, const std::
         }
     }
 
+    if (finished) {   // the train has finished: stops it never reached are not needed
+        std::vector<Station>* lines[] = {&route.main, &route.branch};
+        for (int l = 0; l < 2; ++l) {
+            for (std::size_t i = 0; i < lines[l]->size(); ++i) {
+                if ((*lines[l])[i].kind == Station::Kind::Upcoming) {
+                    (*lines[l])[i].kind = Station::Kind::Skipped;
+                }
+            }
+        }
+    }
     for (std::size_t i = 0; i < route.main.size(); ++i) {
         if (route.main[i].kind == Station::Kind::Done) {
             ++route.done;

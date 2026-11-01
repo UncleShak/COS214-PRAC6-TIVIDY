@@ -62,45 +62,102 @@ void drawCompact(WINDOW* w, const RouteModel& route) {
     }
 }
 
+/** Where the branch goes: its first station, the bend under the drops, and the track ends. */
+struct BranchGeometry {
+    int start, bend, trackStart, trackEnd;
+
+    BranchGeometry(WINDOW* w, const RouteModel& route, int splitColumn) {
+        const int count = static_cast<int>(route.branch.size());
+        const int right = getmaxx(w) - 6;
+        bend = splitColumn + 3;
+        start = splitColumn + 4;
+        if (start + (count - 1) * kStationSpacing > right) {
+            start = std::max(3, right - (count - 1) * kStationSpacing);
+        }
+        trackStart = std::min(bend, start);
+        trackEnd = start + (count - 1) * kStationSpacing;
+    }
+    int stationX(int j) const { return start + j * kStationSpacing; }
+    /** Path index of column @p x on the branch row: the drops are cells 0 and 1. */
+    int cellOf(int x) const { return 2 + std::abs(x - bend); }
+};
+
+int splitColumnOf(WINDOW* w, const RouteModel& route) {
+    const std::vector<int> columns = stationColumns(static_cast<int>(route.main.size()), getmaxx(w) - 4);
+    if (columns.empty() || route.branch.empty() || route.split < 0 ||
+        route.split >= static_cast<int>(columns.size())) {
+        return -1;
+    }
+    return columns[route.split];
+}
+
 void drawBranch(WINDOW* w, const RouteModel& route, int splitColumn, int branchFill) {
     const int count = static_cast<int>(route.branch.size());
-    const int right = getmaxx(w) - 6;
-    int start = splitColumn + 4;
-    if (start + (count - 1) * kStationSpacing > right) {
-        start = std::max(3, right - (count - 1) * kStationSpacing);
-    }
-    const int trackStart = std::min(splitColumn + 3, start);
-    const int trackEnd = start + (count - 1) * kStationSpacing;
-    // Path order for the fill animation: the two drops, then the track left to right.
+    const BranchGeometry g(w, route, splitColumn);
     const bool taken = route.branchTaken;
-    struct Fill {
-        int limit;
-        bool operator()(int cell) const { return limit < 0 || cell < limit; }
-    } filled = {taken ? branchFill : 0};
+    // Cells below `fill` are travelled: thick red track and lit stations. Not animating, the
+    // train has travelled as far as the furthest branch stop it reached.
+    int travelled = 0;
+    for (int j = 0; j < count; ++j) {
+        if (reached(route.branch[j])) {
+            travelled = std::max(travelled, g.cellOf(g.stationX(j)) + 1);
+        }
+    }
+    const int fill = !taken ? 0 : (branchFill < 0 ? travelled : branchFill);
 
     putGlyphs(w, 4, splitColumn + 1, kDrop, Tone::Red);
     putGlyphs(w, 5, splitColumn + 2, kDrop, Tone::Red);
-    for (int x = trackStart; x <= trackEnd; ++x) {
-        const int cell = 2 + std::abs(x - (splitColumn + 3));
-        putGlyphs(w, kBranchRow, x, filled(cell) ? kThick : kThin, Tone::Red);
+    for (int x = g.trackStart; x <= g.trackEnd; ++x) {
+        putGlyphs(w, kBranchRow, x, g.cellOf(x) < fill ? kThick : kThin, Tone::Red);
     }
     for (int j = 0; j < count; ++j) {
         const Station& s = route.branch[j];
-        const int x = start + j * kStationSpacing;
-        const bool on = reached(s) && filled(2 + std::abs(x - (splitColumn + 3)));
-        const char* glyph = !on ? kStop : (s.kind == Station::Kind::Current ? kCurrent : kDone);
-        putGlyphs(w, kBranchRow, x, glyph, Tone::Red);
+        const int x = g.stationX(j);
+        const bool lit = reached(s) && g.cellOf(x) < fill;
+        const char* glyph = !lit ? kStop : (s.kind == Station::Kind::Current ? kCurrent : kDone);
+        putGlyphs(w, kBranchRow, x, glyph, s.kind == Station::Kind::Skipped ? Tone::Dim : Tone::Red);
         putLabel(w, kBranchLabelRow, x, s.label, j == route.branchCurrent ? Tone::Bright : Tone::Muted);
     }
+    // While animating, the train itself: a red ◉ at the head of the fill, down the drops and
+    // along the branch towards the stop it is heading for.
+    if (taken && branchFill >= 0) {
+        int target = route.branchCurrent;
+        for (int j = 0; j < count && target < 0; ++j) {
+            if (reached(route.branch[j])) {
+                target = j;
+            }
+        }
+        const int targetX = g.stationX(target < 0 ? 0 : target);
+        if (branchFill <= g.cellOf(targetX)) {
+            if (branchFill == 0) {
+                putGlyphs(w, 4, splitColumn + 1, kCurrent, Tone::Red);
+            } else if (branchFill == 1) {
+                putGlyphs(w, 5, splitColumn + 2, kCurrent, Tone::Red);
+            } else {
+                const int direction = targetX >= g.bend ? 1 : -1;
+                putGlyphs(w, kBranchRow, g.bend + direction * (branchFill - 2), kCurrent, Tone::Red);
+            }
+        }
+    }
     if (!taken) {
-        const std::string note = "exception route · not taken";
-        if (trackEnd + 3 + static_cast<int>(cells(note)) < getmaxx(w) - 2) {
-            putText(w, kBranchRow, trackEnd + 3, note, Tone::Muted, 1);
+        const std::string note = "exception route \u00B7 not taken";
+        if (g.trackEnd + 3 + static_cast<int>(cells(note)) < getmaxx(w) - 2) {
+            putText(w, kBranchRow, g.trackEnd + 3, note, Tone::Muted, 1);
         }
     }
 }
 
 } // namespace
+
+int branchCellsTo(void* window, const RouteModel& route, int stop) {
+    WINDOW* w = static_cast<WINDOW*>(window);
+    const int splitColumn = splitColumnOf(w, route);
+    if (splitColumn < 0 || stop < 0 || stop >= static_cast<int>(route.branch.size())) {
+        return 0;
+    }
+    const BranchGeometry g(w, route, splitColumn);
+    return g.cellOf(g.stationX(stop)) + 1;
+}
 
 void drawRoute(void* window, const RouteModel& route, int travelTo, int branchFill) {
     WINDOW* w = static_cast<WINDOW*>(window);

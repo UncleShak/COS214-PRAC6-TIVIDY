@@ -57,8 +57,12 @@ struct RouteModel {
 
     RouteModel() : split(-1), branchTaken(false), current(-1), branchCurrent(-1), done(0), arrived(false) {}
 
-    /** @brief Builds the route of @p items (definition order) using @p map (may be empty). */
-    static RouteModel build(const std::vector<WorkItemView>& items, const std::vector<RouteStop>& map);
+    /**
+     * @brief Builds the route of @p items (definition order) using @p map (may be empty).
+     * @param finished the instance is complete: stops it never reached are not needed (Skipped)
+     */
+    static RouteModel build(const std::vector<WorkItemView>& items, const std::vector<RouteStop>& map,
+                            bool finished = false);
 
     /** @brief The stop the train is at (branch first when the exception route is taken), or 0. */
     const Station* currentStation() const;
@@ -85,9 +89,17 @@ std::vector<int> stationColumns(int stationCount, int innerWidth);
  * @brief Draws @p route in the route box @p window (inner rows 1..7).
  * @param travelTo while animating: the travelled track stops at this column and the
  *                 current stop ◉ is drawn there instead of at its station; -1 when not animating
- * @param branchFill while animating the exception route: how many of its cells are filled; -1 for all
+ * @param branchFill while animating the exception route: how many of its cells are filled, with a
+ *                   red ◉ travelling at the head of the fill; -1 for all
  */
 void drawRoute(void* window, const RouteModel& route, int travelTo = -1, int branchFill = -1);
+
+/**
+ * @brief Cells of the exception branch path (the two drops, then the track from the bend)
+ *        up to and including branch stop @p stop, when drawn in @p window. 0 if there is no
+ *        branch or the stations don't fit. Used to time the red fill animation.
+ */
+int branchCellsTo(void* window, const RouteModel& route, int stop);
 
 /** @brief Compact route as glyphs with @p dashes ━ between stops, e.g. ●━━●━━◉━━○ (UTF-8). */
 std::vector<std::pair<std::string, Tone> > miniRoute(const RouteModel& route, int dashes);

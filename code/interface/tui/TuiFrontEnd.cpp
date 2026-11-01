@@ -968,7 +968,8 @@ const std::vector<RouteStop>& TuiFrontEnd::routeMapFor(const std::string& indust
 
 RouteModel TuiFrontEnd::currentRoute() const {
     const SessionView& view = controller_.view();
-    return RouteModel::build(view.workItems, routeMapFor(view.industryId, view.instance.definitionName));
+    return RouteModel::build(view.workItems, routeMapFor(view.industryId, view.instance.definitionName),
+                             view.instance.complete);
 }
 
 bool TuiFrontEnd::isException(const std::string& itemId) const {
@@ -1048,10 +1049,13 @@ std::vector<Line> TuiFrontEnd::listRows(int width, std::vector<int>& rowIndex) c
                 rowIndex.push_back(-1);
             }
             Span glyph = station(item);
-            if (exception && glyph.text == "\u25CB") {
+            Span state = stateLabel(item);
+            if (view.instance.complete && glyph.text == "\u25CB") {   // never reached, and never will be
+                glyph = Span("\u2013", Tone::Dim);
+                state = Span("not needed", Tone::Dim);
+            } else if (exception && glyph.text == "\u25CB") {
                 glyph.tone = Tone::Red;
             }
-            const Span state = stateLabel(item);
             Line row;
             row.add(" ", Tone::Text).add(glyph.text, glyph.tone).add("  " + item.name, Tone::Text);
             row.addRight(state.text, state.tone).addRight(" ", Tone::Text);
@@ -1182,8 +1186,13 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
         lines.push_back(row);
     }
     if (hinted.empty()) {
-        lines.push_back(Line(isFinal(item->state) ? "Nothing: this stop is final." : "Nothing until it becomes available.",
-                             Tone::Muted));
+        std::string why = "Nothing until it becomes available.";
+        if (isFinal(item->state)) {
+            why = "Nothing: this stop is final.";
+        } else if (view.instance.complete) {
+            why = "Not needed: this train has finished its run.";
+        }
+        lines.push_back(Line(why, Tone::Muted));
     }
 
     bool heading = false;
@@ -1547,20 +1556,40 @@ void TuiFrontEnd::animateRoute(const RouteModel& before, const RouteModel& after
     }
     const int kFrameMs = 30;
     const int kMaxFrames = 11;   // 11 x 30 ms stays under 350 ms
+    // The exception route: a red ◉ travels down the drops and along the branch, filling it in.
+    int target = after.branchCurrent;
+    for (int j = 0; j < static_cast<int>(after.branch.size()) && target < 0; ++j) {
+        if (after.branch[j].kind == Station::Kind::Done) {
+            target = j;
+        }
+    }
+    int fillFrom = -1;
     if (!before.branchTaken && after.branchTaken) {
-        // the two drops, the bend, then the branch track to its last stop
-        const int cellsToFill = 2 + 4 + static_cast<int>(after.branch.size() - 1) * kStationSpacing + 1;
-        const int step = std::max(1, (cellsToFill + kMaxFrames - 1) / kMaxFrames);
-        RouteModel dimmed = after;   // the main line dims only once the branch is filled
-        for (std::size_t i = 0; i < dimmed.main.size(); ++i) {
-            if (dimmed.main[i].kind == Station::Kind::Skipped && static_cast<int>(i) > dimmed.split) {
-                dimmed.main[i].kind = Station::Kind::Upcoming;
+        fillFrom = 0;                                               // entering the branch
+    } else if (before.branchTaken && before.branchCurrent >= 0 && target > before.branchCurrent) {
+        fillFrom = branchCellsTo(w, after, before.branchCurrent);   // moving along it
+    }
+    if (fillFrom >= 0 && target >= 0) {
+        const int fillTo = branchCellsTo(w, after, target);
+        RouteModel shown = after;   // the main line dims only once the train is on the branch
+        if (fillFrom == 0) {
+            for (std::size_t i = 0; i < shown.main.size(); ++i) {
+                if (shown.main[i].kind == Station::Kind::Skipped && static_cast<int>(i) > shown.split &&
+                    !controller_.view().instance.complete) {
+                    shown.main[i].kind = Station::Kind::Upcoming;
+                }
             }
         }
-        for (int fill = 0; fill <= cellsToFill; fill += step) {
-            drawRouteBox(dimmed, -1, fill);
+        // A short trip (a stop just past the bend) gets slower frames so the ◉ is seen to travel;
+        // every trip stays under about 350 ms.
+        const int cellsToGo = std::max(1, fillTo - fillFrom);
+        const int step = std::max(1, (cellsToGo + kMaxFrames - 1) / kMaxFrames);
+        const int frames = (cellsToGo + step - 1) / step;
+        const int frameMs = std::max(kFrameMs, std::min(80, 330 / frames));
+        for (int fill = fillFrom; fill < fillTo; fill += step) {
+            drawRouteBox(shown, -1, fill);
             doupdate();
-            napms(kFrameMs);
+            napms(frameMs);
         }
         return;
     }
@@ -1670,6 +1699,13 @@ void TuiFrontEnd::drawAnnounce() {
         line.add("Choose a line to see its trains.", Tone::Band);
     } else if (view.instanceId.empty()) {
         line.add("Choose a train, or press n to start one.", Tone::Band);
+    } else if (view.instance.complete) {
+        const Station* last = currentRoute().lastReached();
+        line.add(view.instanceId + " has reached the end of the line", Tone::Band);
+        if (last != 0) {
+            line.add(" at ", Tone::Band).add(last->name, Tone::BandBright);
+        }
+        line.add(". Press b for other trains.", Tone::Band);
     } else {
         const RouteModel route = currentRoute();
         const Station* now = route.lastReached();
@@ -1871,7 +1907,8 @@ void TuiFrontEnd::drawInstances() {
         const int index = listTop_ + n;
         const InstanceView& instance = view.instances[index];
         const RouteModel route = RouteModel::build(controller_.workItemsOf(instance.id),
-                                                   routeMapFor(instance.industryId, instance.definitionName));
+                                                   routeMapFor(instance.industryId, instance.definitionName),
+                                                   instance.complete);
         std::string status = "running";
         Tone statusTone = Tone::Line;
         if (route.branchTaken) {
