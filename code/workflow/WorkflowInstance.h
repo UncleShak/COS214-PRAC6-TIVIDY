@@ -59,6 +59,7 @@ class WorkflowInstance : public EventSource, public EventListener {
         Participant system;                              // actor for automatic actions (interrupts)
         std::vector<std::unique_ptr<InterruptListener> > interruptListeners;
         bool started;
+        bool externalCancelled = false; // Stops new external calls until cancellation is undone.
 
         const Clock* clock;                              // the engine's clock (or ownClock)
         std::unique_ptr<ManualClock> ownClock;
@@ -91,8 +92,8 @@ class WorkflowInstance : public EventSource, public EventListener {
         void decorate(const std::string& name);
         WorkflowComponent* workOf(WorkItem* item) const;   // outermost decorator, or the item
         void setField(const std::string& key, const std::string& value);
+        void cancelExternalOperations();
         void recordOutcome(const std::string& item, const std::string& outcome);
-        void recordDropped(const ProgressionResult& result);
         void submitApproval(const std::string& name, Participant* requester);
         const ApprovalRequest* latestApproval(const std::string& name) const;
         void finishApproved(const std::string& name);
@@ -119,14 +120,6 @@ class WorkflowInstance : public EventSource, public EventListener {
         bool isStarted() const;
         bool isComplete() const;
         bool isStalled() const;
-        /**
-         * How the run ended, so a finished run can be told apart from a successful one.
-         * Once complete: the outcome of the first end step (WorkflowDefinition::getEndOutcomes,
-         * in setup order) that Completed, or "stopped" if none did. Before that: "not started",
-         * "running", or "stalled" (work is waiting but nothing can proceed). Worked out from
-         * progress each time, so undo changes it too.
-         */
-        std::string getOutcome() const;
 
         // Work items
         bool hasItem(const std::string& name) const;

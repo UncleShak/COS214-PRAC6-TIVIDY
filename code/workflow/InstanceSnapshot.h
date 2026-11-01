@@ -40,8 +40,18 @@ public:
     const std::map<std::string, int>& getSavedDeadlines() const { return savedDeadlines; }
     std::size_t getSavedCommandCount() const { return savedCommandCount; }
     const WorkflowInstance* getOwner() const { return owner; }
+    void saveExternal(const std::string& item, std::unique_ptr<DataPayload> state) {
+        externalStates[item] = std::move(state);
+    }
+    const std::map<std::string, std::unique_ptr<DataPayload> >& getExternalStates() const {
+        return externalStates;
+    }
+    bool externalWasCancelled() const { return externalCancelled; }
+    void saveExternalCancellation(bool value) { externalCancelled = value; }
 private:
 
+    std::map<std::string, std::unique_ptr<DataPayload> > externalStates;
+    bool externalCancelled = false;
     ApprovalDesk::Snapshot savedApprovals;
     std::map<std::string, int> savedDeadlines;
     std::size_t savedCommandCount;

@@ -172,3 +172,13 @@ std::unique_ptr<WorkflowDefinition> ScenarioBuilder::getResult() {
     stages.clear(); items.clear(); edges.clear(); rejectionEdges.clear(); defaults.clear(); routing = nullptr;
     return std::move(product);
 }
+
+void ScenarioBuilder::buildIdentityField(const std::string& field) {
+    requireProduct();
+    if (field.empty()) throw std::invalid_argument("Identity field cannot be empty");
+    product->identityField = field;
+}
+void ScenarioBuilder::buildCancellationItem(const std::string& item) {
+    requireItem(item);
+    product->cancellationItems.insert(item);
+}

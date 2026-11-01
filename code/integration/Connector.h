@@ -12,5 +12,11 @@ public:
     virtual ~Connector() = default;
     virtual bool isAvailable() const = 0;
     virtual std::unique_ptr<DataPayload> invoke(const std::string& operation, const DataPayload& data) = 0;
+    // Optional compensation hooks. State is private to the Adapter, not editable case data.
+    // Stateless connectors keep the defaults. Snapshots own the returned state.
+    virtual std::unique_ptr<DataPayload> saveExternalState(const DataPayload&) const { return nullptr; }
+    virtual void restoreExternalState(const DataPayload&, const DataPayload&) {}
+    virtual std::unique_ptr<DataPayload> cancelExternal(const DataPayload&) { return nullptr; }
+    
 };
 #endif

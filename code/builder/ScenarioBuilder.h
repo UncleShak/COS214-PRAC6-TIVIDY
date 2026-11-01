@@ -23,6 +23,8 @@ protected:
     void buildWorkItem(const std::string& name, const std::string& role, const std::string& stage);
     void buildEntry(const std::string& item);
     void buildDependency(const std::string& dependent, const std::string& prerequisite);
+    void buildIdentityField(const std::string& field);
+    void buildCancellationItem(const std::string& item);
     void buildPath(const std::string& from, const std::string& to);
     void buildBranch(const std::string& from, const RoutingCondition&, const std::vector<std::string>& targets);
     void buildDefaultBranch(const std::string& from, const std::vector<std::string>& targets);

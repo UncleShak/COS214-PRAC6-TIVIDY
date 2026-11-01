@@ -13,6 +13,7 @@
 #include "InterruptListener.h"
 #include "KeyValuePayload.h"
 #include "RoutingCondition.h"
+#include "RoutingCondition.h"
 #include "Stage.h"
 #include "StateFactory.h"
 #include "WorkItem.h"
@@ -57,6 +58,13 @@ WorkflowInstance::WorkflowInstance(const std::string& id, const WorkflowDefiniti
 
         // Instance isolation: clone the payload so changes don't affect other instances
         payload.reset(initialData != nullptr ? initialData->clone() : new KeyValuePayload());
+        // The runtime ID is authoritative even for direct engine callers.
+        const std::string& identity = definition->getIdentityField();
+        if (!identity.empty()) {
+            KeyValuePayload* fields = dynamic_cast<KeyValuePayload*>(payload.get());
+            if (fields == nullptr) throw std::invalid_argument("Identity needs a KeyValuePayload");
+            fields->set(identity, instanceId);
+        }
         tracker.reset(new ProgressionTracker(*def->getRoutingRule(), def->getDependencies(), def->getEntryItems()));
 
         if (clock == nullptr) {
@@ -94,6 +102,8 @@ void WorkflowInstance::setData(const std::string& key, const std::string& value)
     KeyValuePayload* fields = dynamic_cast<KeyValuePayload*>(payload.get());
     if (fields == nullptr) throw std::logic_error("This instance's data cannot be edited field by field");
     if (key.empty()) throw std::invalid_argument("A data field needs a name");
+    if (key == definition->getIdentityField())
+        throw std::invalid_argument("The workflow identity cannot be changed");
     fields->set(key, value);
     history.record("Data: " + key + " = " + value);
 }
@@ -112,16 +122,6 @@ bool WorkflowInstance::isStalled() const { return started && tracker->isStalled(
 
 void WorkflowInstance::requireStarted() const {
     if (!started) throw std::logic_error("Instance " + instanceId + " has not started");
-}
-
-std::string WorkflowInstance::getOutcome() const {
-    if (!tracker->isStarted()) return "not started";
-    if (tracker->isStalled()) return "stalled";
-    if (!tracker->isComplete()) return "running";
-    const std::vector<WorkflowDefinition::EndOutcome>& ends = definition->getEndOutcomes();
-    for (std::size_t i = 0; i < ends.size(); ++i)
-        if (tracker->isCompleted(ends[i].item)) return ends[i].outcome;
-    return "stopped";
 }
 
 bool WorkflowInstance::hasItem(const std::string& name) const { return items.count(name) > 0; }
@@ -164,17 +164,9 @@ void WorkflowInstance::apply(const ProgressionResult& result) {
     for (std::size_t i = 0; i < result.reopened.size(); ++i) getItem(result.reopened[i])->reopen();
     for (std::size_t i = 0; i < result.madeAvailable.size(); ++i) open(result.madeAvailable[i]);
     if (!result.decision.description.empty()) history.record("Routing: " + result.decision.description);
-    recordDropped(result);
-    if (result.instanceComplete) history.record("Instance " + instanceId + " complete: " + getOutcome());
+    if (result.instanceComplete) history.record("Instance " + instanceId + " complete");
     lastProgression = result;
     routedLast = true;
-}
-
-// Steps the tracker dropped because a prerequisite was cancelled or rejected. They were never
-// opened, so their WorkItem stays Created; the history says why they will not run.
-void WorkflowInstance::recordDropped(const ProgressionResult& result) {
-    for (std::size_t i = 0; i < result.dropped.size(); ++i)
-        history.record("Skipped '" + result.dropped[i] + "': a step it needs was cancelled or rejected");
 }
 
 void WorkflowInstance::open(const std::string& name) {
@@ -254,6 +246,8 @@ void WorkflowInstance::completeWork(const std::string& name, Participant* actor)
     WorkflowComponent* target = guard(item, actor);
     const WorkflowDefinition::ConnectorBinding* binding = definition->getConnectorBinding(name);
     // Adapter: only call the external system when the completion itself is allowed.
+    if (binding != nullptr && externalCancelled)
+        throw std::logic_error("External operations were cancelled for this instance");
     if (binding != nullptr) target->authorize("complete");
     if (binding != nullptr && item->getCurrentState()->getStateName() == "Started" &&
         item->getAssignedParticipant() == actor) {
@@ -263,6 +257,7 @@ void WorkflowInstance::completeWork(const std::string& name, Participant* actor)
         history.record("Connector: '" + name + "' called " + binding->operation);
     }
     runCommand(new CompleteCommand(item, actor, target));
+    if (definition->isCancellationItem(name)) cancelExternalOperations();
     recordOutcome(name, "completed");
     apply(tracker->complete(name, *payload));
 }
@@ -281,8 +276,13 @@ void WorkflowInstance::cancelWork(const std::string& name, Participant* actor) {
     beginAction();
     WorkItem* item = getItem(name);
     runCommand(new CancelCommand(item, actor, guard(item, actor)));
-    recordDropped(tracker->cancel(name));
-    if (tracker->isComplete()) history.record("Instance " + instanceId + " complete: " + getOutcome());
+    tracker->cancel(name);
+    const WorkflowDefinition::ConnectorBinding* binding = definition->getConnectorBinding(name);
+    if (binding != nullptr) {
+        std::unique_ptr<DataPayload> result = binding->connector->cancelExternal(*payload);
+        if (result) payload = std::move(result);
+    }
+    if (tracker->isComplete()) history.record("Instance " + instanceId + " complete");
 }
 
 void WorkflowInstance::escalateWork(const std::string& name, Participant* actor) {
@@ -334,6 +334,7 @@ void WorkflowInstance::finishRejected(const std::string& name, Participant* deci
     setField(definition->getApprovalRule(name)->resultField, "no");
     runCommand(new RejectCommand(item, decider, reason));
     recordOutcome(name, "rejected");
+        recordOutcome(name, "rejected");
     apply(tracker->reject(name, *payload));
 }
 
@@ -423,6 +424,13 @@ void WorkflowInstance::interrupt(const WorkflowDefinition::InterruptRule& rule, 
       requireStarted();
     if (tracker->isComplete()) return; // Events must not restart a finished instance.
 
+    // Compensate external work even if it completed before this event.
+    for (std::size_t i = 0; i < rule.cancel.size(); ++i) {
+        if (definition->getConnectorBinding(rule.cancel[i]) != nullptr) {
+            cancelExternalOperations();
+            break;
+        }
+    }
     history.record("Interrupt " + rule.eventType + (reason.empty() ? "" : ": " + reason));
     for (std::size_t i = 0; i < rule.cancel.size(); ++i) {
         const std::string& name = rule.cancel[i];
@@ -465,17 +473,40 @@ InstanceSnapshot* WorkflowInstance::createSnapshot() const {
             ? -1 : entry.second->deadline->getDueTime();
     ApprovalDesk::Snapshot approvals;
     if (approvalDesk) approvals = approvalDesk->save();
-    return new InstanceSnapshot(saved, payload->clone(), tracker->saveProgress(),
-                                approvals, deadlines, commandLog.size(), this);
+    std::unique_ptr<InstanceSnapshot> snapshot(new InstanceSnapshot(
+        saved, payload->clone(), tracker->saveProgress(), approvals, deadlines, commandLog.size(), this));
+    snapshot->saveExternalCancellation(externalCancelled);
+    for (const auto& entry : items) {
+        const WorkflowDefinition::ConnectorBinding* binding = definition->getConnectorBinding(entry.first);
+        if (binding != nullptr) {
+            std::unique_ptr<DataPayload> state = binding->connector->saveExternalState(*payload);
+            if (state) snapshot->saveExternal(entry.first, std::move(state));
+        }
+    }
+    return snapshot.release();
 }
 
 void WorkflowInstance::restore(const InstanceSnapshot* snapshot) {
     if (snapshot == nullptr) throw std::invalid_argument("Cannot restore a null snapshot");
+    if (snapshot->getOwner() != this)
+        throw std::invalid_argument("Snapshot belongs to another instance");
+    if (snapshot->getSavedCommandCount() > commandLog.size())
+        throw std::invalid_argument("Snapshot is ahead of the command log");
+    std::unique_ptr<DataPayload> restoredData(snapshot->getSavedPayload() != nullptr
+        ? snapshot->getSavedPayload()->clone() : new KeyValuePayload());
+    // Reconcile external effects first. An unavailable warehouse or insufficient
+    // stock refuses undo BEFORE local tasks/payload or the undo entry are changed.
+    for (const auto& entry : snapshot->getExternalStates()) {
+        const WorkflowDefinition::ConnectorBinding* binding = definition->getConnectorBinding(entry.first);
+        if (binding == nullptr) throw std::logic_error("Snapshot connector is missing");
+        binding->connector->restoreExternalState(*payload, *entry.second);
+    }
     const std::map<std::string, InstanceSnapshot::ItemRecord>& saved = snapshot->getSavedItems();
     for (std::map<std::string, InstanceSnapshot::ItemRecord>::const_iterator it = saved.begin(); it != saved.end(); ++it) {
         getItem(it->first)->restoreState(createWorkItemState(it->second.state), it->second.assignee);
     }
-    payload.reset(snapshot->getSavedPayload() != nullptr ? snapshot->getSavedPayload()->clone() : new KeyValuePayload());
+    payload = std::move(restoredData);
+    externalCancelled = snapshot->externalWasCancelled();
     tracker->restoreProgress(snapshot->getSavedProgress());
     started = snapshot->getSavedProgress().started;
 
@@ -492,4 +523,17 @@ void WorkflowInstance::restore(const InstanceSnapshot* snapshot) {
     commandLog.truncate(snapshot->getSavedCommandCount());
     beginAction();
     history.record("Snapshot restored; audit history retained");
+}
+
+void WorkflowInstance::cancelExternalOperations() {
+    if (externalCancelled) return;
+    for (const auto& entry : items) {
+        const WorkflowDefinition::ConnectorBinding* binding = definition->getConnectorBinding(entry.first);
+        if (binding != nullptr) {
+            std::unique_ptr<DataPayload> result = binding->connector->cancelExternal(*payload);
+            if (result) payload = std::move(result);
+        }
+    }
+    externalCancelled = true;
+    history.record("External reservations cancelled");
 }

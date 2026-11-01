@@ -3,6 +3,7 @@
 
 // holds the current structure of a process and has now copies running
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <vector>
@@ -47,17 +48,11 @@ class WorkflowDefinition {
             std::string resultField;
         };
 
-        // How a run ended: completing `item` gives the instance this outcome ("succeeded",
-        // "cancelled", ...). Kept in setup order; when several tagged items completed, the
-        // first one listed wins. See WorkflowInstance::getOutcome().
-        struct EndOutcome {
-            std::string item;
-            std::string outcome;
-        };
-
     private:
         WorkflowComponent* rootStage;
         std::string definitionVersion;
+        std::string identityField; // Bound to the runtime ID; never editable.
+        std::set<std::string> cancellationItems;
 
         // Filled in by a ScenarioBuilder (Builder pattern)
         std::vector<std::string> entryItems;
@@ -70,7 +65,6 @@ class WorkflowDefinition {
         std::map<std::string, DecorationRule> decorations;
         std::map<std::string, ApprovalRule> approvals;
         std::unique_ptr<ApprovalHandler> approvalChain;   // first handler; owns its successors
-        std::vector<EndOutcome> endOutcomes;
         friend class ScenarioBuilder;
 
         WorkflowDefinition(const WorkflowDefinition&);
@@ -82,6 +76,8 @@ class WorkflowDefinition {
         virtual WorkflowComponent* getRootStage() const;
         virtual std::string getVersion() const;
 
+        const std::string& getIdentityField() const { return identityField; }
+        bool isCancellationItem(const std::string& item) const { return cancellationItems.count(item) != 0; }
         const std::vector<std::string>& getEntryItems() const;
         const DependencyGraph& getDependencies() const;
         RoutingRule* getRoutingRule() const;
@@ -94,7 +90,6 @@ class WorkflowDefinition {
         const DecorationRule* getDecoration(const std::string& itemName) const;
         const ApprovalRule* getApprovalRule(const std::string& itemName) const;
         ApprovalHandler* getApprovalChain() const;
-        const std::vector<EndOutcome>& getEndOutcomes() const;
 };
 
 #endif
