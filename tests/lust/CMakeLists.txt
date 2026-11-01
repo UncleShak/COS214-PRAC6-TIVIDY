@@ -36,3 +36,20 @@ target_link_libraries(lust_tests lust_fake tividy_ui_core)
 enable_testing()
 add_test(NAME lust_tests COMMAND lust_tests)
 
+
+# Scenario / robustness tests against the REAL engine (only inside the root build, where the engine exists).
+# FLAGGED: failing tests here document engine bugs on purpose.
+if(TARGET tividy_engine)
+  add_executable(lust_scenario_tests
+      ${REPO_ROOT}/tests/envy/test_main.cpp
+      test_scenarios.cpp
+      test_engine_robustness.cpp
+  )
+  target_include_directories(lust_scenario_tests PRIVATE ${REPO_ROOT}/tests/envy ${REPO_ROOT}/code ${REPO_ROOT}/code/interface)
+  target_link_libraries(lust_scenario_tests PRIVATE tividy_engine)
+  if(TARGET tividy_real_engine)
+    target_sources(lust_scenario_tests PRIVATE test_gateway_real.cpp)
+    target_link_libraries(lust_scenario_tests PRIVATE tividy_real_engine)
+  endif()
+  tividy_configure(lust_scenario_tests)
+endif()

@@ -44,10 +44,7 @@ int runPlain(tividy::ui::InterfaceController& controller, bool echo) {
 }
 
 #ifdef TIVIDY_WITH_CURSES
-/**
- * Every exception is caught inside the session's scope and reported only after the
- * session's destructor has restored the terminal, so the message is readable.
- */
+
 int runCurses(tividy::ui::InterfaceController& controller) {
     std::string error;
     {
