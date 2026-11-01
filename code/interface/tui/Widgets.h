@@ -91,6 +91,12 @@ std::size_t cells(const std::string& text);
 /** @brief The first @p width cells of @p text, never splitting a UTF-8 sequence. */
 std::string cutCells(const std::string& text, std::size_t width);
 
+/** @brief @p text broken into lines of at most @p width cells, at spaces where possible. */
+std::vector<std::string> wrap(const std::string& text, std::size_t width);
+
+/** @brief Plain lines longer than @p width are wrapped onto more lines in the same tone; span lines are kept. */
+std::vector<Line> wrapLines(const std::vector<Line>& lines, std::size_t width);
+
 /** @brief True for the keys that mean "confirm" (Enter on every terminal). */
 bool isEnter(int key);
 /** @brief True for the keys that delete the last character. */

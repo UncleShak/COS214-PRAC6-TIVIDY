@@ -214,6 +214,46 @@ std::string fit(const std::string& text, std::size_t width) {
     return text + std::string(width - used, ' ');
 }
 
+std::vector<std::string> wrap(const std::string& text, std::size_t width) {
+    std::vector<std::string> out;
+    std::string rest = text;
+    while (width > 0 && cells(rest) > width) {
+        const std::string head = cutCells(rest, width + 1);
+        std::size_t space = head.rfind(' ');
+        if (space == std::string::npos || space == 0) {
+            const std::string piece = cutCells(rest, width);
+            out.push_back(piece);
+            rest = rest.substr(piece.size());
+        } else {
+            out.push_back(rest.substr(0, space));
+            rest = rest.substr(space + 1);
+        }
+    }
+    out.push_back(rest);
+    return out;
+}
+
+std::vector<Line> wrapLines(const std::vector<Line>& lines, std::size_t width) {
+    std::vector<Line> out;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        if (!lines[i].spans.empty() || !lines[i].right.empty() || cells(lines[i].text) <= width) {
+            out.push_back(lines[i]);
+            continue;
+        }
+        // keep a leading indent on the continuation lines
+        std::size_t indent = 0;
+        while (indent < lines[i].text.size() && lines[i].text[indent] == ' ') {
+            ++indent;
+        }
+        const std::string pad(indent, ' ');
+        const std::vector<std::string> parts = wrap(lines[i].text.substr(indent), width - indent);
+        for (std::size_t p = 0; p < parts.size(); ++p) {
+            out.push_back(Line(pad + parts[p], lines[i].tone));
+        }
+    }
+    return out;
+}
+
 bool isEnter(int key) {
     return key == '\n' || key == '\r' || key == KEY_ENTER;
 }

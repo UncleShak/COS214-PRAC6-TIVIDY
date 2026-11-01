@@ -123,6 +123,9 @@ public:
      */
     std::vector<RouteStop> routeMap(const std::string& industryId, const std::string& definition) const;
 
+    /** @brief Work items of any instance of the current industry (for overviews); empty if refused. */
+    std::vector<WorkItemView> workItemsOf(const std::string& instanceId) const;
+
     /** @brief Display name of the participant with @p participantId, or "" if unknown. */
     std::string participantName(const std::string& participantId) const;
 

@@ -51,9 +51,12 @@ void separateLabels(std::vector<Station>& stations) {
             Station* both[] = {&stations[i], &stations[j]};
             for (int k = 0; k < 2; ++k) {
                 const std::string& name = both[k]->name;
-                const std::string first = stationLabel(name, "");
-                if (name.size() > first.size()) {
-                    both[k]->label = stationLabel(name.substr(first.size()), "");
+                std::size_t first = 1;
+                while (first < name.size() && !std::isupper(static_cast<unsigned char>(name[first]))) {
+                    ++first;
+                }
+                if (name.size() > first) {
+                    both[k]->label = stationLabel(name.substr(first), "");
                 }
             }
         }
@@ -63,14 +66,16 @@ void separateLabels(std::vector<Station>& stations) {
 } // namespace
 
 std::string stationLabel(const std::string& name, const std::string& given) {
-    if (!given.empty()) {
-        return given.substr(0, 8);
+    std::string word = given;
+    if (word.empty()) {
+        std::size_t end = 1;
+        while (end < name.size() && !std::isupper(static_cast<unsigned char>(name[end]))) {
+            ++end;
+        }
+        word = name.substr(0, end);
     }
-    std::size_t end = 1;
-    while (end < name.size() && !std::isupper(static_cast<unsigned char>(name[end]))) {
-        ++end;
-    }
-    return name.substr(0, std::min<std::size_t>(end, 8));
+    // A cut word ends in "…" so it does not read as a typo.
+    return word.size() > 8 ? word.substr(0, 7) + "\u2026" : word;
 }
 
 RouteModel RouteModel::build(const std::vector<WorkItemView>& items, const std::vector<RouteStop>& map) {

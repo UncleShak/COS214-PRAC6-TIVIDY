@@ -1066,12 +1066,21 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
     if (screen_ == Screen::Industries) {
         if (selected_ < static_cast<int>(view.industries.size())) {
             const IndustryInfo& industry = view.industries[selected_];
-            lines.push_back(Line(industry.displayName, Tone::Line));
-            lines.push_back(Line(industry.description));
+            Line head;
+            head.add(bullet(number(selected_ + 1)), Theme::industryBullet(selected_));
+            head.add("  " + industry.displayName, Tone::TextBold);
+            if (!industry.sector.empty()) {
+                head.add("  " + industry.sector, Tone::Muted);
+            }
+            lines.push_back(head);
             lines.push_back(Line());
-            lines.push_back(Line("Workflow definitions:", Tone::Muted));
-            for (std::size_t i = 0; i < industry.definitions.size(); ++i) {
-                lines.push_back(Line("  " + industry.definitions[i]));
+            lines.push_back(Line(industry.description));
+            for (std::size_t d = 0; d < industry.definitions.size(); ++d) {
+                const int width = detailWindow() != 0 ? getmaxx(detailWindow()) - 4 : 40;
+                const std::vector<Line> preview = routePreview(industry.id, industry.definitions[d], width);
+                lines.push_back(Line());
+                lines.push_back(Line("MAIN ROUTE \u00B7 " + industry.definitions[d], Tone::Muted));
+                lines.insert(lines.end(), preview.begin(), preview.end());
             }
             lines.push_back(Line());
             lines.push_back(Line("Enter: work in this industry", Tone::Muted));
@@ -1198,10 +1207,44 @@ std::vector<Line> TuiFrontEnd::detailLines() const {
 std::vector<Line> TuiFrontEnd::bodyLines() const {
     std::vector<Line> lines;
     if (screen_ == Screen::History) {
-        for (std::size_t i = 0; i < historyLines_.size(); ++i) {
-            char index[16];
-            std::snprintf(index, sizeof(index), "%4d  ", static_cast<int>(i) + 1);
-            lines.push_back(Line(index + historyLines_[i]));
+        // A trip log: one stop per event down a vertical line; the newest event is ◉.
+        const std::size_t count = historyLines_.size();
+        for (std::size_t i = 0; i < count; ++i) {
+            const bool newest = newestFirst_ ? i == 0 : i + 1 == count;
+            std::string text = historyLines_[i];
+            const std::size_t tagEnd = text.compare(0, 1, "[") == 0 ? text.find("] ") : std::string::npos;
+            const std::string tag = tagEnd == std::string::npos ? "" : text.substr(1, tagEnd - 1);
+            if (tagEnd != std::string::npos) {
+                text = text.substr(tagEnd + 2);
+            }
+            if (text.compare(0, 2, "- ") == 0) {
+                text = text.substr(2);
+            }
+            std::string item;
+            if (text.compare(0, 6, "Item: ") == 0) {   // "Item: X (A -> B)" reads "X   A → B"
+                const std::size_t open = text.find(" (");
+                item = text.substr(6, open == std::string::npos ? std::string::npos : open - 6);
+                if (open != std::string::npos && text.size() > open + 3) {
+                    std::string change = text.substr(open + 2, text.size() - open - 3);
+                    const std::size_t arrow = change.find(" -> ");
+                    if (arrow != std::string::npos) {
+                        change = change.substr(0, arrow) + " \u2192 " + change.substr(arrow + 4);
+                    }
+                    text = fit(item, 20) + "  " + change;
+                }
+            }
+            const bool escalation = text.find("Escalated") != std::string::npos;
+            const bool exception = (!item.empty() && isException(item)) || text.find("Rejected") != std::string::npos ||
+                                   text.find("Cancelled") != std::string::npos;
+            Line row;
+            row.add(newest ? "\u25C9" : "\u25CF", exception ? Tone::Red : (newest ? Tone::Line : Tone::Bright));
+            row.add("  " + (tag.empty() ? std::string() : fit(tag, 14)), Tone::Muted);
+            row.add(escalation ? " " + text + " " : text,
+                    escalation ? Tone::Escalated : (exception ? Tone::Red : Tone::Text));
+            lines.push_back(row);
+            if (i + 1 < count) {
+                lines.push_back(Line().add("\u2503", Tone::Track));
+            }
         }
         if (lines.empty()) {
             lines.push_back(Line(filter_.empty() ? "No history yet." : "No entries contain '" + filter_ + "'.",
@@ -1374,6 +1417,8 @@ void TuiFrontEnd::draw() {
         drawPanes();
     } else if (screen_ == Screen::History || screen_ == Screen::Reports) {
         drawBody();
+    } else if (screen_ == Screen::Instances) {
+        drawInstances();
     } else {
         drawPanes();
     }
@@ -1623,7 +1668,7 @@ void TuiFrontEnd::drawPanes() {
     }
     const bool panelFocused = focus_ == Pane::Detail || showPanel_;
     drawFrame(detail, title, panelFocused);
-    const std::vector<Line> lines = detailLines();
+    const std::vector<Line> lines = wrapLines(detailLines(), static_cast<std::size_t>(std::max(8, getmaxx(detail) - 4)));
     const int shown = std::max(1, getmaxy(detail) - 2);
     detailTop_ = std::max(0, std::min(detailTop_, static_cast<int>(lines.size()) - shown));
     for (int row = 0; row < shown && detailTop_ + row < static_cast<int>(lines.size()); ++row) {
@@ -1641,10 +1686,10 @@ void TuiFrontEnd::drawBody() {
     werase(w);
     int firstRow = 1;
     if (screen_ == Screen::History) {
-        drawFrame(w, "HISTORY  " + number(static_cast<int>(historyLines_.size())) + " entries, " +
-                         (newestFirst_ ? "newest first" : "oldest first") +
-                         (filter_.empty() ? "" : ", containing '" + filter_ + "'"),
-                  true);
+        drawFrame(w, "TRIP LOG \u00B7 " + controller_.view().instanceId, true,
+                  number(static_cast<int>(historyLines_.size())) + " events, " +
+                      (newestFirst_ ? "newest first" : "oldest first") +
+                      (filter_.empty() ? "" : ", containing '" + filter_ + "'"));
     } else {
         drawFrame(w, "REPORTS", true);
         int x = 2;
@@ -1663,7 +1708,7 @@ void TuiFrontEnd::drawBody() {
     const int count = static_cast<int>(lines.size());
     bodyTop_ = std::max(0, std::min(bodyTop_, count - shown));
     for (int row = 0; row < shown && bodyTop_ + row < count; ++row) {
-        putText(w, firstRow + row, 2, lines[bodyTop_ + row].text, lines[bodyTop_ + row].tone, 2);
+        putLine(w, firstRow + row, 2, getmaxx(w) - 4, lines[bodyTop_ + row], false);
     }
     if (count > shown) {
         char where[48];
@@ -1671,6 +1716,115 @@ void TuiFrontEnd::drawBody() {
                       count);
         putText(w, getmaxy(w) - 1, getmaxx(w) - static_cast<int>(std::string(where).size()) - 2, where,
                 Tone::Muted, 1);
+    }
+    touchwin(w);
+    wnoutrefresh(w);
+}
+
+std::vector<Line> TuiFrontEnd::routePreview(const std::string& industryId, const std::string& definition,
+                                            int width) const {
+    std::vector<Line> lines;
+    const std::vector<RouteStop>& map = routeMapFor(industryId, definition);
+    std::vector<WorkItemView> stops;
+    for (std::size_t i = 0; i < map.size(); ++i) {
+        WorkItemView v;
+        v.id = map[i].workItemId;
+        v.name = map[i].workItemId;
+        v.state = "Completed";
+        stops.push_back(v);
+    }
+    const RouteModel route = RouteModel::build(stops, map);
+    const int perRow = std::max(1, (width - 8) / kStationSpacing + 1);
+    std::string track;
+    for (int d = 0; d < kStationSpacing - 1; ++d) {
+        track += "\u2501";
+    }
+    for (std::size_t first = 0; first < route.main.size(); first += perRow) {
+        Line glyphs;
+        Line labels;
+        for (std::size_t i = first; i < route.main.size() && i < first + perRow; ++i) {
+            glyphs.add("\u25CF", Tone::Bright);
+            if (i + 1 < route.main.size()) {
+                glyphs.add(track, Tone::Track);
+            }
+            labels.add(fit(route.main[i].label, kStationSpacing), Tone::Muted);
+        }
+        lines.push_back(glyphs);
+        lines.push_back(labels);
+    }
+    return lines;
+}
+
+void TuiFrontEnd::drawInstances() {
+    const SessionView& view = controller_.view();
+    WINDOW* w = layout_.body();
+    werase(w);
+    std::string industry = industryName();
+    for (std::size_t i = 0; i < industry.size(); ++i) {
+        industry[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(industry[i])));
+    }
+    const int count = static_cast<int>(view.instances.size());
+    drawFrame(w, "INSTANCES \u00B7 " + industry, true,
+              number(count) + (count == 1 ? " train" : " trains") + " on this line");
+    if (count == 0) {
+        putText(w, 2, 3, "No trains on this line yet. Press n to start one.", Tone::Muted, 2);
+        touchwin(w);
+        wnoutrefresh(w);
+        return;
+    }
+
+    const int visible = std::max(1, (getmaxy(w) - 2) / 2);   // a row and a blank row per train
+    selected_ = std::max(0, std::min(selected_, count - 1));
+    if (selected_ < listTop_) {
+        listTop_ = selected_;
+    } else if (selected_ >= listTop_ + visible) {
+        listTop_ = selected_ - visible + 1;
+    }
+    const int inner = getmaxx(w) - 2;
+    for (int n = 0; n < visible && listTop_ + n < count; ++n) {
+        const int index = listTop_ + n;
+        const InstanceView& instance = view.instances[index];
+        const RouteModel route = RouteModel::build(controller_.workItemsOf(instance.id),
+                                                   routeMapFor(instance.industryId, instance.definitionName));
+        std::string status = "running";
+        Tone statusTone = Tone::Line;
+        if (route.branchTaken) {
+            status = "exception";
+            statusTone = Tone::Red;
+        } else if (instance.complete) {
+            status = "complete";
+            statusTone = Tone::Green;
+        } else if (instance.stalled) {
+            status = "stalled";
+            statusTone = Tone::Red;
+        }
+        const Station* now = route.currentStation();
+        std::string where = "arrived";
+        if (!instance.complete && !route.arrived) {
+            where = route.branchCurrent >= 0 ? "exception route"
+                                             : "stop " + number(route.current + 1) + " of " +
+                                                   number(static_cast<int>(route.main.size()));
+        }
+
+        Line row;
+        row.add(" " + fit(instance.id, 8), Tone::TextBold);
+        const std::vector<std::pair<std::string, Tone> > mini = miniRoute(route, 2);
+        std::size_t miniWidth = 0;
+        for (std::size_t c = 0; c < mini.size(); ++c) {
+            row.add(mini[c].first, mini[c].second);
+            miniWidth += cells(mini[c].first);
+        }
+        row.add(std::string(miniWidth < 28 ? 28 - miniWidth : 0, ' ') + "  ", Tone::Text);
+        row.add(fit(status, 10), statusTone);
+        row.add(fit(now != 0 && !now->assignee.empty() ? now->assignee : "-", 16), Tone::Text);
+        row.addRight(where + " ", Tone::Muted);
+
+        const int y = 1 + 2 * n;
+        const bool chosen = index == selected_;
+        if (chosen) {
+            fillRow(w, y, 1, inner, Tone::Select);
+        }
+        putLine(w, y, 2, inner - 2, row, chosen);
     }
     touchwin(w);
     wnoutrefresh(w);

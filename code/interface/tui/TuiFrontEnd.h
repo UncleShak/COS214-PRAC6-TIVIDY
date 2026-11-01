@@ -152,6 +152,10 @@ private:
     void drawAnnounce();
     void drawPanes();
     void drawBody();
+    /** @brief The Instances screen: one train per row with its mini route line. */
+    void drawInstances();
+    /** @brief The route preview of a definition: rows of ● stops with labels, @p width cells wide. */
+    std::vector<Line> routePreview(const std::string& industryId, const std::string& definition, int width) const;
     /** @brief The key hints. */
     void drawFooter();
     /** @brief The list window of the current screen (dashboard or page). */

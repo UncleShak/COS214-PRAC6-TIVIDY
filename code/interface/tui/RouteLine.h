@@ -69,8 +69,9 @@ struct RouteModel {
 };
 
 /**
- * @brief Up to 8 characters for a station label: @p given if the engine provides one, else
- *        the first CamelCase word of @p name ("SelectDeliveryType" gives "Select").
+ * @brief Up to 8 cells for a station label: @p given if the engine provides one, else
+ *        the first CamelCase word of @p name ("SelectDeliveryType" gives "Select"). A longer
+ *        word is cut to 7 characters and "…".
  */
 std::string stationLabel(const std::string& name, const std::string& given);
 

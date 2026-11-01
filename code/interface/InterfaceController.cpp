@@ -459,6 +459,14 @@ std::vector<RouteStop> InterfaceController::routeMap(const std::string& industry
     }
 }
 
+std::vector<WorkItemView> InterfaceController::workItemsOf(const std::string& instanceId) const {
+    try {
+        return engine_.listWorkItems(instanceId);
+    } catch (...) {
+        return std::vector<WorkItemView>();
+    }
+}
+
 std::string InterfaceController::participantName(const std::string& participantId) const {
     for (std::size_t i = 0; i < view_.participants.size(); ++i) {
         if (view_.participants[i].id == participantId) {

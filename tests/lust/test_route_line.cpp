@@ -41,7 +41,7 @@ TEST_SUITE("lust route line") {
 TEST_CASE("labels: the engine's short label, else the first CamelCase word, at most 8 characters") {
     CHECK(stationLabel("SelectDeliveryType", "") == "Select");
     CHECK(stationLabel("Dispatch", "") == "Dispatch");
-    CHECK(stationLabel("TransportToRefinery", "") == "Transpor");
+    CHECK(stationLabel("TransportToRefinery", "") == "Transpo\u2026");
     CHECK(stationLabel("ReceiveOrder", "Intake") == "Intake");
 }
 

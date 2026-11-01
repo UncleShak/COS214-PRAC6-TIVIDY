@@ -30,7 +30,7 @@ bool reached(const Station& s) {
 }
 
 void putLabel(WINDOW* w, int y, int column, const std::string& label, Tone tone) {
-    const int width = static_cast<int>(label.size());
+    const int width = static_cast<int>(cells(label));
     const int x = std::max(2, std::min(column - width / 2, getmaxx(w) - 2 - width));
     putText(w, y, x, label, tone, 1);
 }
