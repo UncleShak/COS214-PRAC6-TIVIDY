@@ -1,0 +1,108 @@
+@startuml PatternClassDiagram_Visitor
+' Pattern class diagram: Visitor (monitoring and reporting).
+' Owner: Envy. Green = Envy's classes in src/monitoring/reports. Yellow = teammates' classes (headers on integration-Code).
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #33CC33
+  BorderColor #1E7A1E
+}
+hide empty members
+title Visitor: monitoring and reporting (actual C++ classes)
+
+abstract class WorkflowVisitor <<Visitor>> {
+  +{abstract} visitWorkItem(item : WorkItem*) : void
+  +{abstract} visitStage(stage : Stage*) : void
+}
+
+class ProgressReportVisitor <<ConcreteVisitor>> {
+  -total : int
+  -stages : int
+  -byState : map<string, int>
+  +visitWorkItem(item : WorkItem*) : void
+  +visitStage(stage : Stage*) : void
+  +totalItems() : int
+  +countIn(stateName : string) : int
+  +percentComplete() : int
+  +summary() : string
+  +reset() : void
+}
+
+class OverdueWorkVisitor <<ConcreteVisitor>> {
+  -overdue : vector<WorkItem*>
+  +visitWorkItem(item : WorkItem*) : void
+  +visitStage(stage : Stage*) : void
+  +overdueItems() : vector<WorkItem*>
+  +overdueNames() : vector<string>
+  +hasOverdueWork() : bool
+  +reset() : void
+}
+
+class AuditReportVisitor <<ConcreteVisitor>> {
+  -report : vector<string>
+  +visitWorkItem(item : WorkItem*) : void
+  +visitStage(stage : Stage*) : void
+  +lines() : vector<string>
+  +text() : string
+  +reset() : void
+}
+
+abstract class WorkflowComponent <<Element (Pride)>> #FFFF66 {
+  +{abstract} getName() : string
+  +{abstract} request() : void
+  +{abstract} add(c : WorkflowComponent*) : void
+  +{abstract} remove(c : WorkflowComponent*) : void
+  +{abstract} accept(v : WorkflowVisitor*) : void
+}
+
+class WorkItem <<ConcreteElement (Pride)>> #FFFF66 {
+  +accept(v : WorkflowVisitor*) : void
+  +getCurrentState() : WorkItemState*
+  +getAssignedParticipant() : Participant*
+  +getRequiredRole() : string
+}
+
+class Stage <<ConcreteElement (Pride, not yet coded)>> #FFFF66 {
+  -children : vector<WorkflowComponent*>
+  +accept(v : WorkflowVisitor*) : void
+}
+
+class TaskDecorator <<Decorator (Gluttony)>> #FFFF66 {
+  +accept(v : WorkflowVisitor*) : void
+}
+
+class WorkflowInstance <<ObjectStructure (Pride)>> #FFFF66 {
+}
+
+class "Interface / monitoring" as Client <<Client (Lust)>> #FFFF66 {
+}
+
+WorkflowVisitor <|-- ProgressReportVisitor
+WorkflowVisitor <|-- OverdueWorkVisitor
+WorkflowVisitor <|-- AuditReportVisitor
+WorkflowComponent <|-- WorkItem
+WorkflowComponent <|-- Stage
+WorkflowComponent <|-- TaskDecorator
+Stage o-- "*" WorkflowComponent : children
+TaskDecorator o-- "1" WorkflowComponent : component
+WorkflowInstance --> "1" WorkflowComponent : root
+Client ..> WorkflowVisitor : creates
+Client ..> WorkflowInstance : root->accept(visitor)
+WorkflowComponent ..> WorkflowVisitor : accept(v)
+
+note right of WorkItem
+  accept(v): v->visitWorkItem(this)
+end note
+note right of Stage
+  accept(v): v->visitStage(this);
+  then child->accept(v) for each child
+end note
+note bottom of TaskDecorator
+  accept(v): component->accept(v)
+  (decorated work is visited as the real WorkItem)
+end note
+note bottom of OverdueWorkVisitor
+  Overdue = state "Escalated"
+  (nobody acted in time; DeadlineExceeded -> EscalateCommand)
+end note
+@enduml

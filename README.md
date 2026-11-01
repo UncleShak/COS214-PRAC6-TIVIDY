@@ -35,7 +35,7 @@ Requires CMake 3.12+, a C++11 compiler and `libncursesw` (wide-character ncurses
 | `-DTIVIDY_SANITIZE=ON` | AddressSanitizer + UBSan build |
 | `-DTIVIDY_WITH_CURSES=OFF` | Build without ncurses (only `--plain` mode) |
 
-CMake picks up every `.cpp` under `code/` and every `tests/*/test_*.cpp` automatically,
+CMake picks up every `.cpp` under `src/` and every `test_*.cpp` in the test folders automatically,
 so adding a file never needs a build-file change. Everything compiles with
 `-Wall -Wextra -pedantic`.
 
@@ -60,37 +60,63 @@ so adding a file never needs a build-file change. Everything compiles with
 
 ## Project layout
 
+The code is organised by the job each part does in the system, not by design pattern.
+
 ```
-code/
-  core/          WorkflowEngine facade and exceptions
-  state/         work-item lifecycle (State)
-  routing/       sequential, parallel and data-driven routing (Strategy)
-  progression/   dependencies, joins, rejection and cancellation handling
-  builder/       workflow definitions (Builder / Director)
-  workflow/      stages, work items (Composite), instances (Prototype)
-  scenarios/     Arkham Express and Dune industries (Abstract Factory)
-  integration/   external warehouse service (Adapter)
-  proxy/         role-based access control (Proxy)
-  observer/      notifications and monitoring (Observer)
-  history/       per-instance event history
-  command/       undoable actions (Command)
-  decorator/     audit, deadline, retry and validation on tasks (Decorator)
-  iterator/      safe traversal of work and history (Iterator)
-  visitor/       progress reports (Visitor)
-  approval/      approval chain (Chain of Responsibility)
-  assignment/    role- and workload-based assignment
-  participants/  people, roles and workload
-  interface/     TUI, plain mode, EngineGateway bridge to the engine
-  app/           main.cpp
-tests/           doctest suites + end-to-end demo scripts
-docs/            diagrams, research, Visual Paradigm models
+src/
+  main.cpp             program entry point
+  engine/              WorkflowEngine (Facade), exceptions, engine configuration
+    commands/          undoable user actions and the command log (Command)
+  workflow/
+    model/             definitions, instances, stages, work items (Composite, Prototype), instance data
+    lifecycle/         work-item states: Available, Assigned, Started... (State)
+    building/          building workflow definitions (Builder / Director)
+  execution/
+    routing/           sequential and data-driven routing (Strategy)
+    progression/       dependencies and moving work forward when items complete
+    traversal/         walking available work and history (Iterator)
+  people/              participants and roles
+    assignment/        choosing who gets work: by role or workload (Strategy)
+    approval/          approval chain (Chain of Responsibility)
+  tasks/               extra behaviour on tasks: audit, deadline, retry, validation (Decorator)
+  security/            role-based access control (Proxy)
+  monitoring/
+    events/            event sources and listeners (Observer)
+    history/           per-instance event history
+    reports/           progress, overdue and audit reports (Visitor)
+  industries/          industry catalog (Abstract Factory) and the Connector interface (Adapter)
+    arkham/            Arkham Express parcel delivery, warehouse adapter
+    dune/              Dune Spice Harvest
+  ui/                  controller, command interpreter, input validation, EngineGateway
+    real/              gateway to the real engine
+    plain/             line-based front end (--plain)
+    tui/               ncurses front end (subway-map TUI)
+
+tests/
+  unit/                one class or pattern at a time
+  integration/         patterns working together through the engine
+  gateway/             the UI's bridge to the real engine
+  ui/                  interface tests on a fake engine (ui/fake)
+  stress/              robustness suite against the real engine (not in CTest)
+  e2e/                 demo scripts fed into the real program
+  support/             doctest.h, shared main(), test helpers
+
+docs/
+  design/              pattern justifications, decision logs, TUI plan
+  diagrams/            class, activity, sequence and state diagrams (uml/ sources, vpp/ models)
+  research/            pattern research and the brief
+  docker.md            Docker setup and troubleshooting
+  presentation.md      testing / Docker / Doxygen presentation notes
 ```
+
+Headers are included by file name only (`#include "WorkItem.h"`); CMake puts every folder
+under `src/` on the include path, so moving a file between folders needs no code changes.
 
 ## Design patterns
 
-State, Strategy, Composite, Builder, Prototype, Abstract Factory, Facade, Adapter, Proxy, Observer,
-Command, Decorator, Iterator, Visitor and Chain of Responsibility, each in its own folder
-under `code/` (see the layout above). Class diagrams are in `docs/diagrams` and `docs/vpp`.
+State, Strategy, Composite, Builder, Prototype, Abstract Factory, Facade, Adapter, Proxy,
+Observer, Command, Decorator, Iterator, Visitor and Chain of Responsibility. The layout above
+shows where each one lives. Class diagrams are in `docs/diagrams`.
 
 ## Testing
 
@@ -102,22 +128,22 @@ and end to end (the real program driven by a script).
 |---|---|---|---|
 | `tividy_tests` (engine: unit + integration) | 187 | 831 | All pass |
 | `gateway_tests` (UI ↔ engine bridge) | 9 | 93 | All pass |
-| `lust_tests` (interface, on a fake engine) | 46 | 15,022 | All pass |
+| `ui_tests` (interface, on a fake engine) | 46 | 15,022 | All pass |
 | `demo_arkham_demo`, `demo_dune_demo` | 2 scripts | — | Both pass |
 
 ```bash
 ctest --test-dir build --output-on-failure   # everything, including the demo scripts
 ./build/tividy_tests                         # engine only
-./build/tests/lust/lust_tests                # interface only
+./build/tests/ui/ui_tests                    # interface only
 
 # with sanitizers
 cmake -S . -B build-asan -DTIVIDY_SANITIZE=ON && cmake --build build-asan && ctest --test-dir build-asan
 ```
 
-The demo scripts (`tests/scripts/*_demo.txt`) are piped into `tividy --plain --echo`;
+The demo scripts (`tests/e2e/*_demo.txt`) are piped into `tividy --plain --echo`;
 each passes if the program exits cleanly and prints every line in the matching `.expect`.
 
-`./build/tests/lust/lust_scenario_tests` is an extra stress suite, not part of CTest
+`./build/stress_tests` (from `tests/stress`) is an extra stress suite, not part of CTest
 (92 cases, including a random walk that checks undo restores state exactly). 75 pass; the
 17 failures are deliberate and document known engine limitations.
 
@@ -138,11 +164,11 @@ docker run -it --rm tividy ./build/tividy --help             # all options
 # tests
 docker run --rm tividy ctest --test-dir build --output-on-failure
 docker run --rm tividy ./build/tividy_tests                  # engine tests only
-docker run --rm tividy ./build/tests/lust/lust_tests         # interface tests only
+docker run --rm tividy ./build/tests/ui/ui_tests             # interface tests only
 
 # demo scripts
-docker run -i --rm tividy sh -c "./build/tividy --plain --echo < tests/scripts/arkham_demo.txt"
-docker run -i --rm tividy sh -c "./build/tividy --plain --echo < tests/scripts/dune_demo.txt"
+docker run -i --rm tividy sh -c "./build/tividy --plain --echo < tests/e2e/arkham_demo.txt"
+docker run -i --rm tividy sh -c "./build/tividy --plain --echo < tests/e2e/dune_demo.txt"
 
 # open a shell inside the container
 docker run -it --rm tividy bash
@@ -159,12 +185,12 @@ docker system prune          # delete stopped containers and unused data
 - Run these in a real terminal (WSL, Windows Terminal, VS Code), not Docker Desktop's
   Run button or Logs tab.
 
-Installation and troubleshooting: [docker.md](docker.md).
+Installation and troubleshooting: [docs/docker.md](docs/docker.md).
 
 ## Documentation (Doxygen)
 
-Headers under `code/` carry Doxygen comments (`@brief`, `@param`, `@return`). The
-`Doxyfile` in the repo root is already configured (input `code/`, HTML only, UML-style
+Headers under `src/` carry Doxygen comments (`@brief`, `@param`, `@return`). The
+`Doxyfile` in the repo root is already configured (input `src/`, HTML only, UML-style
 class and collaboration diagrams).
 
 ```bash

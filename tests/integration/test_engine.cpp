@@ -6,15 +6,15 @@
 #include <memory>
 #include <stdexcept>
 
-#include "builder/EngineConfigurator.h"
-#include "core/WorkflowEngine.h"
-#include "core/WorkflowException.h"
-#include "scenarios/arkham/ArkhamExpressBuilder.h"
-#include "scenarios/arkham/WarehouseConnector.h"
-#include "assignment/RoleBasedAssignment.h"
-#include "visitor/ProgressReportVisitor.h"
-#include "workflow/WorkItem.h"
-#include "participants/Participant.h"
+#include "EngineConfigurator.h"
+#include "WorkflowEngine.h"
+#include "WorkflowException.h"
+#include "ArkhamExpressBuilder.h"
+#include "WarehouseConnector.h"
+#include "RoleBasedAssignment.h"
+#include "ProgressReportVisitor.h"
+#include "WorkItem.h"
+#include "Participant.h"
 
 namespace {
 

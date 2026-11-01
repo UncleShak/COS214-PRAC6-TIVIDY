@@ -1,4 +1,4 @@
-// The shipped EngineGateway (code/interface/real/RealEngine) against the real engine.
+// The shipped EngineGateway (src/ui/real/RealEngine) against the real engine.
 #include "doctest.h"
 
 #include <algorithm>

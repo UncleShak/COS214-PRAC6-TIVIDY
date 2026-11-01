@@ -5,15 +5,15 @@
 #include <memory>
 #include <stdexcept>
 
-#include "builder/EngineConfigurator.h"
-#include "builder/ScenarioBuilder.h"
-#include "core/WorkflowEngine.h"
-#include "core/WorkflowException.h"
-#include "assignment/RoleBasedAssignment.h"
-#include "proxy/AccessControlProxy.h"
-#include "proxy/ActionAccessPolicy.h"
-#include "participants/Participant.h"
-#include "workflow/WorkItem.h"
+#include "EngineConfigurator.h"
+#include "ScenarioBuilder.h"
+#include "WorkflowEngine.h"
+#include "WorkflowException.h"
+#include "RoleBasedAssignment.h"
+#include "AccessControlProxy.h"
+#include "ActionAccessPolicy.h"
+#include "Participant.h"
+#include "WorkItem.h"
 
 namespace {
 

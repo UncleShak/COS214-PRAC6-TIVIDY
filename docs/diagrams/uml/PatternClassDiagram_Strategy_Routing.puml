@@ -1,0 +1,145 @@
+@startuml PatternClassDiagram_Strategy_Routing
+' Pattern class diagram: Strategy (routing) with dependencies and progression.
+' Owner: Envy. Every class and operation here exists in src/execution/routing, src/execution/progression and src/workflow/model.
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #33CC33
+  BorderColor #1E7A1E
+}
+hide empty members
+title Strategy: routing, dependencies and progression (actual C++ classes)
+
+class WorkflowInstance <<Context (Pride)>> #FFFF66 {
+  -payload : DataPayload*
+  -tracker : ProgressionTracker
+  +completeWorkItem(item : WorkItem*) : void
+}
+
+class ProgressionTracker {
+  -routing : const RoutingRule&
+  -dependencies : const DependencyGraph&
+  -entryItems : vector<string>
+  -started : bool
+  -available : vector<string>
+  -waiting : vector<string>
+  -completed : set<string>
+  -rejected : set<string>
+  -cancelled : set<string>
+  +ProgressionTracker(routing, dependencies, entryItems)
+  +start() : vector<string>
+  +complete(item : string, instanceData : DataPayload) : ProgressionResult
+  +reject(item : string, instanceData : DataPayload) : ProgressionResult
+  +cancel(item : string) : void
+  +complete(item : WorkflowComponent*, instanceData : DataPayload*) : ProgressionResult
+  +reject(item : WorkflowComponent*, instanceData : DataPayload*) : ProgressionResult
+  +cancel(item : WorkflowComponent*) : void
+  +isAvailable(item : string) : bool
+  +isWaiting(item : string) : bool
+  +isCompleted(item : string) : bool
+  +isRejected(item : string) : bool
+  +isCancelled(item : string) : bool
+  +unmetPrerequisites(item : string) : vector<string>
+  +createIterator() : unique_ptr<WorkflowIterator<string>>
+  +isComplete() : bool
+  +isStalled() : bool
+}
+
+abstract class RoutingRule <<Strategy>> {
+  +{abstract} determineNextWork(completedItem : string, instanceData : DataPayload) : RoutingDecision
+  +determineNextWork(completedItem : WorkflowComponent*, instanceData : DataPayload*) : RoutingDecision
+}
+
+class SequentialRouting <<ConcreteStrategy>> {
+  -configuredPath : map<string, vector<string>>
+  +addPath(from : string, to : string) : void
+  +determineNextWork(completedItem, instanceData) : RoutingDecision
+  #followPath(completedItem : string) : RoutingDecision
+}
+
+class DataBasedRouting <<ConcreteStrategy>> {
+  -decisions : map<string, DecisionPoint>
+  +addBranch(decisionItem : string, condition : RoutingCondition, targets : vector<string>) : void
+  +setDefaultBranch(decisionItem : string, targets : vector<string>) : void
+  +hasDecision(item : string) : bool
+  +determineNextWork(completedItem, instanceData) : RoutingDecision
+}
+
+class RoutingCondition {
+  -label : string
+  -predicate : function<bool(const DataPayload&)>
+  +{static} equals(field : string, value : string) : RoutingCondition
+  +{static} notEquals(field : string, value : string) : RoutingCondition
+  +{static} greaterThan(field : string, limit : double) : RoutingCondition
+  +{static} atMost(field : string, limit : double) : RoutingCondition
+  +evaluate(data : DataPayload) : bool
+  +getLabel() : string
+}
+
+class DependencyGraph {
+  -prerequisites : map<string, set<string>>
+  +addDependency(dependent : string, prerequisite : string) : void
+  +prerequisitesOf(item : string) : vector<string>
+  +unmetPrerequisites(item : string, completed : set<string>) : vector<string>
+  +isSatisfied(item : string, completed : set<string>) : bool
+}
+
+abstract class DataPayload <<Team>> #FFFF66 {
+  +{abstract} getPayloadType() : string
+  +{abstract} clone() : DataPayload*
+}
+
+class KeyValuePayload {
+  -values : map<string, string>
+  +getPayloadType() : string
+  +clone() : DataPayload*
+  +set(key : string, value : string) : void
+  +has(key : string) : bool
+  +get(key : string) : string
+  +getNumber(key : string) : double
+}
+
+class RoutingDecision <<struct>> {
+  +completedItem : string
+  +description : string
+  +nextItems : vector<string>
+}
+
+class ProgressionResult <<struct>> {
+  +outcome : string
+  +decision : RoutingDecision
+  +madeAvailable : vector<string>
+  +waiting : vector<string>
+  +reopened : vector<string>
+  +instanceComplete : bool
+}
+
+class WorkflowDefinition <<Pride>> #FFFF66 {
+}
+
+WorkflowDefinition "1" *-- "1" RoutingRule : routingRule
+WorkflowDefinition "1" *-- "1" DependencyGraph : dependencies
+WorkflowInstance "1" *-- "1" ProgressionTracker : tracker
+WorkflowInstance "1" *-- "1" DataPayload : payload
+ProgressionTracker "*" --> "1" RoutingRule : uses >
+ProgressionTracker "*" --> "1" DependencyGraph : checks >
+RoutingRule <|.. SequentialRouting
+SequentialRouting <|-- DataBasedRouting
+DataBasedRouting "1" *-- "*" RoutingCondition : branch guards
+RoutingRule ..> RoutingDecision : creates
+ProgressionTracker ..> ProgressionResult : creates
+ProgressionResult *-- RoutingDecision
+DataPayload <|-- KeyValuePayload
+RoutingCondition ..> KeyValuePayload : reads fields
+
+note bottom of RoutingRule
+  Shared by every instance of a definition:
+  stateless (const) and works with work-item
+  names, never pointers into one instance.
+end note
+note right of ProgressionTracker
+  One per instance. Holds this instance's
+  progress only; the definition's rule and
+  dependencies are read, never changed.
+end note
+@enduml

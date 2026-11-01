@@ -5,15 +5,15 @@
 #include <memory>
 #include <stdexcept>
 
-#include "core/WorkflowEngine.h"
-#include "core/WorkflowException.h"
-#include "scenarios/IndustryCatalog.h"
-#include "scenarios/arkham/ArkhamExpressFactory.h"
-#include "scenarios/dune/DuneHarvestFactory.h"
-#include "participants/Participant.h"
-#include "workflow/WorkItem.h"
-#include "approval/ApprovalRequest.h"
-#include "approval/ApprovalHandler.h"
+#include "WorkflowEngine.h"
+#include "WorkflowException.h"
+#include "IndustryCatalog.h"
+#include "ArkhamExpressFactory.h"
+#include "DuneHarvestFactory.h"
+#include "Participant.h"
+#include "WorkItem.h"
+#include "ApprovalRequest.h"
+#include "ApprovalHandler.h"
 
 namespace {
 
