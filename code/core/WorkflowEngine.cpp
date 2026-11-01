@@ -230,12 +230,26 @@ std::vector<std::string> WorkflowEngine::advanceClock(int units) {
     if (units <= 0) throw std::invalid_argument("The clock only moves forward");
     clock.advance(units);
     std::vector<std::string> changes;
+    
     for (std::size_t i = 0; i < instanceOrder.size(); ++i) {
-        perform(instanceOrder[i], "clock +" + std::to_string(units), [&](WorkflowInstance& instance) {
+        WorkflowInstance& instance = requireInstance(instanceOrder[i]);
+        
+        // Skip finished instances altogether
+        if (instance.isComplete()) continue;
+
+        // Keep the snapshot-and-restore-on-error protection, but skip the undo stack
+        std::unique_ptr<InstanceSnapshot> before(instance.createSnapshot());
+        try {
             const std::vector<std::string> lines = instance.onClockAdvanced();
             changes.insert(changes.end(), lines.begin(), lines.end());
-        });
+        } catch (...) {
+            instance.restore(before.get());
+            recountWorkloads();
+            throw;
+        }
+
     }
+    
     recountWorkloads();
     return changes;
 }
@@ -256,7 +270,15 @@ std::string WorkflowEngine::nextUndoLabel(const std::string& instanceId) const {
 
 std::string WorkflowEngine::undo(const std::string& instanceId) {
     WorkflowInstance& instance = requireInstance(instanceId);
+    
+    // Pop the last valid action and restore the state
     const std::string label = caretakers[instanceId]->undo(instance);
+    
+    // Run the overdue check to instantly escalate restored steps that miss the current engine time
+    if (!instance.isComplete()) {
+        instance.onClockAdvanced(); 
+    }
+    
     recountWorkloads();
     return label;
 }
