@@ -114,6 +114,7 @@ TuiFrontEnd::TuiFrontEnd(InterfaceController& controller, const std::string& eng
 }
 
 void TuiFrontEnd::run() {
+    showSplash();
     draw();
     while (running_) {
         const int key = getch();
@@ -602,11 +603,13 @@ void TuiFrontEnd::performAction(WorkAction action, const WorkItemView& item, boo
         }
     }
 
+    const RouteModel before = currentRoute();
     status_ = controller_.perform(action, item.id, assignee, reason);
     if (status_.isError()) {
         showRefusal(item.id, item.state, status_.text);
     } else {
         showOutcome();
+        animateRoute(before, currentRoute());
     }
     reselect(item.id);
 }
@@ -645,6 +648,7 @@ void TuiFrontEnd::approvalsMenu() {
 
     const WorkItemView* item = findItem(approval.workItemId);
     const std::string stateBefore = item != 0 ? item->state : "";
+    const RouteModel before = currentRoute();
     if (decision == 0) {
         status_ = controller_.approve(approval.id);
     } else {
@@ -660,6 +664,7 @@ void TuiFrontEnd::approvalsMenu() {
         showRefusal(approval.workItemId, stateBefore, status_.text);
     } else {
         showOutcome();
+        animateRoute(before, currentRoute());
     }
 }
 
@@ -716,6 +721,7 @@ void TuiFrontEnd::raiseEvent() {
         return;
     }
     std::vector<std::string> changes;
+    const RouteModel before = currentRoute();
     status_ = controller_.raiseEvent(types[pick], description, changes);
     if (status_.isError()) {
         return;
@@ -732,6 +738,8 @@ void TuiFrontEnd::raiseEvent() {
     lines.push_back(Line("u undoes it", Tone::Muted));
     Dialog::alert(types[pick], description.empty() ? controller_.view().instanceId : description, lines);
     layout_.rebuild();   // the alert covered the whole screen: repaint every window from scratch
+    draw();
+    animateRoute(before, currentRoute());
 }
 
 void TuiFrontEnd::undo() {
@@ -1495,8 +1503,14 @@ void TuiFrontEnd::drawHeader() {
         context += "   \u00B7   acting as " + actor + (roles.empty() ? "" : " (" + roles + ")");
     }
     const std::string next = screen_ == Screen::Dashboard ? controller_.nextUndo() : "";
-    const std::string label = (next.empty() ? "" : "u undo " + next + "   ") + "[" + engineLabel_ + "]";
-    const int labelX = std::max(COLS / 2, COLS - 1 - static_cast<int>(label.size()));
+    const std::string engine = "[" + engineLabel_ + "]";
+    std::string undoHint = next.empty() ? "" : "u undo " + next;
+    const std::size_t undoRoom = static_cast<std::size_t>(std::max(0, COLS / 2 - 6 - static_cast<int>(engine.size())));
+    if (cells(undoHint) > undoRoom) {
+        undoHint = undoRoom > 1 ? cutCells(undoHint, undoRoom - 1) + "\u2026" : "";
+    }
+    const std::string label = (undoHint.empty() ? "" : undoHint + "   ") + engine;
+    const int labelX = std::max(COLS / 2, COLS - 1 - static_cast<int>(cells(label)));
     putText(w, 1, 1, cutCells(context, static_cast<std::size_t>(labelX - 3)), Tone::BandMuted, 0);
     putText(w, 1, labelX, label, Tone::BandMuted, 1);
     touchwin(w);
@@ -1507,12 +1521,84 @@ void TuiFrontEnd::drawRoute() {
     const SessionView& view = controller_.view();
     WINDOW* w = layout_.route();
     werase(w);
-    const RouteModel route = currentRoute();
-    drawFrame(w, "ROUTE \u00B7 " + view.instanceId, false,
+    (void)view;
+    (void)w;
+    drawRouteBox(currentRoute(), -1, -1);
+}
+
+void TuiFrontEnd::drawRouteBox(const RouteModel& route, int travelTo, int branchFill) {
+    WINDOW* w = layout_.route();
+    werase(w);
+    drawFrame(w, "ROUTE \u00B7 " + controller_.view().instanceId, false,
               number(route.done) + " of " + number(static_cast<int>(route.main.size())) + " stops");
-    ui::drawRoute(w, route);
+    ui::drawRoute(w, route, travelTo, branchFill);
     touchwin(w);
     wnoutrefresh(w);
+}
+
+void TuiFrontEnd::animateRoute(const RouteModel& before, const RouteModel& after) {
+    WINDOW* w = layout_.route();
+    if (layout_.tooSmall() || screen_ != Screen::Dashboard || w == 0) {
+        return;
+    }
+    const std::vector<int> columns = stationColumns(static_cast<int>(after.main.size()), getmaxx(w) - 4);
+    if (columns.empty()) {
+        return;   // the compact form has nothing to slide along
+    }
+    const int kFrameMs = 30;
+    const int kMaxFrames = 11;   // 11 x 30 ms stays under 350 ms
+    if (!before.branchTaken && after.branchTaken) {
+        // the two drops, the bend, then the branch track to its last stop
+        const int cellsToFill = 2 + 4 + static_cast<int>(after.branch.size() - 1) * kStationSpacing + 1;
+        const int step = std::max(1, (cellsToFill + kMaxFrames - 1) / kMaxFrames);
+        RouteModel dimmed = after;   // the main line dims only once the branch is filled
+        for (std::size_t i = 0; i < dimmed.main.size(); ++i) {
+            if (dimmed.main[i].kind == Station::Kind::Skipped && static_cast<int>(i) > dimmed.split) {
+                dimmed.main[i].kind = Station::Kind::Upcoming;
+            }
+        }
+        for (int fill = 0; fill <= cellsToFill; fill += step) {
+            drawRouteBox(dimmed, -1, fill);
+            doupdate();
+            napms(kFrameMs);
+        }
+        return;
+    }
+    if (before.current < 0 || after.current <= before.current ||
+        after.current >= static_cast<int>(columns.size())) {
+        return;
+    }
+    const int from = columns[before.current];
+    const int to = columns[after.current];
+    const int step = std::max(1, (to - from + kMaxFrames - 1) / kMaxFrames);
+    for (int x = from; x < to; x += step) {
+        drawRouteBox(after, x, -1);
+        doupdate();
+        napms(kFrameMs);
+    }
+}
+
+void TuiFrontEnd::showSplash() {
+    if (layout_.tooSmall()) {
+        return;
+    }
+    Theme::paint(stdscr);
+    werase(stdscr);
+    const int y = LINES / 2;
+    const int x = (COLS - 18) / 2;
+    putText(stdscr, y, x, bullet("1"), Tone::Bullet1, 0);
+    putText(stdscr, y, x + 4, bullet("2"), Tone::Bullet2, 0);
+    putText(stdscr, y, x + 10, "TIVIDY", Tone::Bright, 0);
+    putText(stdscr, y + 2, (COLS - 22) / 2, "Se7en workflow engine", Tone::Muted, 0);
+    wrefresh(stdscr);
+    timeout(800);
+    const int key = getch();
+    timeout(-1);
+    if (key == KEY_RESIZE) {
+        layout_.rebuild();
+    }
+    werase(stdscr);   // stdscr shows through the blank rows; leave it empty
+    wnoutrefresh(stdscr);
 }
 
 void TuiFrontEnd::drawMenu() {

@@ -147,6 +147,16 @@ private:
     void drawHeader();
     /** @brief The full-width route box at the top of the dashboard. */
     void drawRoute();
+    /** @brief The route box for @p route; @p travelTo and @p branchFill draw one animation frame. */
+    void drawRouteBox(const RouteModel& route, int travelTo, int branchFill);
+    /**
+     * @brief Animates the change from @p before to @p after: the current stop ◉ travels to the
+     *        next stop, or the exception branch fills in red. At most about 350 ms; skipped when
+     *        the stations don't fit (the compact form) or the dashboard is not showing.
+     */
+    void animateRoute(const RouteModel& before, const RouteModel& after);
+    /** @brief The two route bullets and TIVIDY, centred, for 800 ms or until a key. */
+    void showSplash();
     void drawMenu();
     /** @brief The one-row announcement bar (events, errors, confirmations). */
     void drawAnnounce();
