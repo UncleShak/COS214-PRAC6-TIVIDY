@@ -36,6 +36,10 @@ void DuneHarvestBuilder::buildRules() {
     const char* const rejectable[] = {"SurveyField", "ApproveHarvestPermit", "DeployHarvester",
                                       "DeployCarryall", "Harvest"};
     for (const char* item : rejectable) buildRejectionPath(item, {"AbandonRun"});
+    // How a run ended (other-bugs #17). An evacuation outranks spice that still shipped.
+    buildEndOutcome("Evacuate", "evacuated");
+    buildEndOutcome("AbandonRun", "abandoned");
+    buildEndOutcome("TransportToRefinery", "succeeded");
     buildDependency("ApproveHarvestPermit", "SurveyField");
     buildDependency("Harvest", "DeployHarvester");   // the harvester waits for both machines
     buildDependency("Harvest", "DeployCarryall");

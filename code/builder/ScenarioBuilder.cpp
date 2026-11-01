@@ -84,6 +84,18 @@ void ScenarioBuilder::buildRejectionPath(const std::string& from, const std::vec
     if (routing->hasRejectionPath(from)) throw std::invalid_argument("'" + from + "' already has a rejection path");
     routing->setRejectionPath(from, targets); rejectionEdges[from] = targets;
 }
+void ScenarioBuilder::buildEndOutcome(const std::string& item, const std::string& outcome) {
+    requireItem(item);
+    if (outcome.empty()) throw std::invalid_argument("End outcome for '" + item + "' needs a name");
+    // These describe a run that has not ended at a tagged step (WorkflowInstance::getOutcome).
+    if (outcome == "not started" || outcome == "running" || outcome == "stalled" || outcome == "stopped")
+        throw std::invalid_argument("'" + outcome + "' is reserved and cannot be an end outcome");
+    for (const auto& tagged : product->endOutcomes)
+        if (tagged.item == item) throw std::invalid_argument("'" + item + "' already has an end outcome");
+    WorkflowDefinition::EndOutcome tag;
+    tag.item = item; tag.outcome = outcome;
+    product->endOutcomes.push_back(tag);
+}
 void ScenarioBuilder::buildAssignmentRule(std::unique_ptr<AssignmentRule> rule) {
     requireProduct();
     if (!rule) throw std::invalid_argument("Assignment rule cannot be null");

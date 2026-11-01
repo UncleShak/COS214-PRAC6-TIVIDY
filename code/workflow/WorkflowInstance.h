@@ -119,6 +119,14 @@ class WorkflowInstance : public EventSource, public EventListener {
         bool isStarted() const;
         bool isComplete() const;
         bool isStalled() const;
+        /**
+         * How the run ended, so a finished run can be told apart from a successful one.
+         * Once complete: the outcome of the first end step (WorkflowDefinition::getEndOutcomes,
+         * in setup order) that Completed, or "stopped" if none did. Before that: "not started",
+         * "running", or "stalled" (work is waiting but nothing can proceed). Worked out from
+         * progress each time, so undo changes it too.
+         */
+        std::string getOutcome() const;
 
         // Work items
         bool hasItem(const std::string& name) const;
