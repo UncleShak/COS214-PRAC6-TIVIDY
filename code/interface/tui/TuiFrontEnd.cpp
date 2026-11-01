@@ -841,8 +841,9 @@ void TuiFrontEnd::showRefusal(const std::string& itemId, const std::string& stat
 
 void TuiFrontEnd::reselect(const std::string& itemId) {
     const std::vector<WorkItemView>& rows = items();
-    for (std::size_t i = 0; i < rows.size(); ++i) {
-        if (rows[i].id == itemId) {
+    const std::vector<int> order = itemOrder();
+    for (std::size_t i = 0; i < order.size(); ++i) {
+        if (rows[order[i]].id == itemId) {
             selected_ = static_cast<int>(i);
             return;
         }
@@ -856,12 +857,55 @@ const std::vector<WorkItemView>& TuiFrontEnd::items() const {
     return availableOnly_ ? controller_.view().availableWork : controller_.view().workItems;
 }
 
+std::vector<int> TuiFrontEnd::itemOrder() const {
+    const std::vector<WorkItemView>& rows = items();
+    std::vector<int> order;
+    for (int pass = 0; pass < 2; ++pass) {
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            if (isException(rows[i].id) == (pass == 1)) {
+                order.push_back(static_cast<int>(i));
+            }
+        }
+    }
+    return order;
+}
+
 const WorkItemView* TuiFrontEnd::selectedItem() const {
     const std::vector<WorkItemView>& rows = items();
-    if (selected_ < 0 || selected_ >= static_cast<int>(rows.size())) {
+    const std::vector<int> order = itemOrder();
+    if (selected_ < 0 || selected_ >= static_cast<int>(order.size())) {
         return 0;
     }
-    return &rows[selected_];
+    return &rows[order[selected_]];
+}
+
+const std::vector<RouteStop>& TuiFrontEnd::routeMapFor(const std::string& industryId,
+                                                       const std::string& definition) const {
+    const std::string key = industryId + "/" + definition;
+    std::map<std::string, std::vector<RouteStop> >::iterator it = routeMaps_.find(key);
+    if (it == routeMaps_.end()) {
+        it = routeMaps_.insert(std::make_pair(key, controller_.routeMap(industryId, definition))).first;
+    }
+    return it->second;
+}
+
+RouteModel TuiFrontEnd::currentRoute() const {
+    const SessionView& view = controller_.view();
+    return RouteModel::build(view.workItems, routeMapFor(view.industryId, view.instance.definitionName));
+}
+
+bool TuiFrontEnd::isException(const std::string& itemId) const {
+    const SessionView& view = controller_.view();
+    if (view.instanceId.empty()) {
+        return false;
+    }
+    const std::vector<RouteStop>& map = routeMapFor(view.industryId, view.instance.definitionName);
+    for (std::size_t i = 0; i < map.size(); ++i) {
+        if (map[i].workItemId == itemId) {
+            return map[i].exception;
+        }
+    }
+    return false;
 }
 
 const WorkItemView* TuiFrontEnd::findItem(const std::string& itemId) const {
@@ -893,9 +937,10 @@ int TuiFrontEnd::rowCount() const {
     }
 }
 
-std::vector<Line> TuiFrontEnd::listRows(int width) const {
+std::vector<Line> TuiFrontEnd::listRows(int width, std::vector<int>& rowIndex) const {
     const SessionView& view = controller_.view();
     std::vector<Line> rows;
+    rowIndex.clear();
     if (screen_ == Screen::Industries) {
         for (std::size_t i = 0; i < view.industries.size(); ++i) {
             Line row;
@@ -913,15 +958,34 @@ std::vector<Line> TuiFrontEnd::listRows(int width) const {
         }
     } else if (screen_ == Screen::Dashboard) {
         const std::vector<WorkItemView>& work = items();
-        for (std::size_t i = 0; i < work.size(); ++i) {
-            const WorkItemView& item = work[i];
-            const Span glyph = station(item);
+        const std::vector<int> order = itemOrder();
+        for (std::size_t n = 0; n < order.size(); ++n) {
+            const WorkItemView& item = work[order[n]];
+            const bool exception = isException(item.id);
+            if (exception && (n == 0 || !isException(work[order[n - 1]].id))) {
+                if (!rows.empty()) {
+                    rows.push_back(Line());
+                    rowIndex.push_back(-1);
+                }
+                rows.push_back(Line(" EXCEPTION ROUTE", Tone::Red));
+                rowIndex.push_back(-1);
+            }
+            Span glyph = station(item);
+            if (exception && glyph.text == "\u25CB") {
+                glyph.tone = Tone::Red;
+            }
             const Span state = stateLabel(item);
             Line row;
             row.add(" ", Tone::Text).add(glyph.text, glyph.tone).add("  " + item.name, Tone::Text);
             row.addRight(state.text, state.tone).addRight(" ", Tone::Text);
             rows.push_back(row);
+            rowIndex.push_back(static_cast<int>(n));
         }
+        (void)width;
+        return rows;
+    }
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        rowIndex.push_back(static_cast<int>(i));
     }
     return rows;
 }
@@ -1231,6 +1295,8 @@ void TuiFrontEnd::draw() {
         drawTooSmall();
         return;
     }
+    touchwin(stdscr);   // the blank rows between panes: wipe what a closed dialog left there
+    wnoutrefresh(stdscr);
     drawHeader();
     drawMenu();
     if (screen_ == Screen::Dashboard) {
@@ -1326,7 +1392,10 @@ void TuiFrontEnd::drawRoute() {
     const SessionView& view = controller_.view();
     WINDOW* w = layout_.route();
     werase(w);
-    drawFrame(w, "ROUTE \u00B7 " + view.instanceId, false);
+    const RouteModel route = currentRoute();
+    drawFrame(w, "ROUTE \u00B7 " + view.instanceId, false,
+              number(route.done) + " of " + number(static_cast<int>(route.main.size())) + " stops");
+    ui::drawRoute(w, route);
     touchwin(w);
     wnoutrefresh(w);
 }
@@ -1409,31 +1478,38 @@ void TuiFrontEnd::drawPanes() {
     werase(list);
     drawFrame(list, listTitle(), focus_ == Pane::List, listSummary());
     const int width = getmaxx(list) - 4;
-    const std::vector<Line> rows = listRows(width);
+    std::vector<int> rowIndex;
+    const std::vector<Line> rows = listRows(width, rowIndex);
     const int count = static_cast<int>(rows.size());
     const int visible = std::max(1, getmaxy(list) - 2);
-    selected_ = std::max(0, std::min(selected_, count - 1));
-    if (selected_ < listTop_) {
-        listTop_ = selected_;
-    } else if (selected_ >= listTop_ + visible) {
-        listTop_ = selected_ - visible + 1;
+    selected_ = std::max(0, std::min(selected_, rowCount() - 1));
+    int chosenRow = 0;
+    for (int r = 0; r < count; ++r) {
+        if (rowIndex[r] == selected_) {
+            chosenRow = r;
+        }
+    }
+    if (chosenRow < listTop_) {
+        listTop_ = chosenRow > 0 && rowIndex[chosenRow - 1] < 0 ? chosenRow - 1 : chosenRow;
+    } else if (chosenRow >= listTop_ + visible) {
+        listTop_ = chosenRow - visible + 1;
     }
     listTop_ = std::max(0, std::min(listTop_, std::max(0, count - visible)));
 
     if (rows.empty()) {
-        putText(list, 1, 2, emptyListText(), screen_ == Screen::Industries ? Tone::Red : Tone::Muted);
+        putText(list, 1, 2, emptyListText(), Tone::Muted);
     }
     for (int row = 0; row < visible && listTop_ + row < count; ++row) {
-        const int index = listTop_ + row;
-        const bool chosen = index == selected_;
+        const int r = listTop_ + row;
+        const bool chosen = rowIndex[r] >= 0 && r == chosenRow;
         if (chosen && focus_ != Pane::List) {
             fillRow(list, 1 + row, 1, getmaxx(list) - 2, Tone::Band);
-            putLine(list, 1 + row, 2, width, rows[index], false);
+            putLine(list, 1 + row, 2, width, rows[r], false);
         } else {
             if (chosen) {
                 fillRow(list, 1 + row, 1, getmaxx(list) - 2, Tone::Select);
             }
-            putLine(list, 1 + row, 2, width, rows[index], chosen);
+            putLine(list, 1 + row, 2, width, rows[r], chosen);
         }
     }
     if (listTop_ > 0 || listTop_ + visible < count) {

@@ -450,6 +450,15 @@ std::vector<WorkAction> InterfaceController::hintedActions(const std::string& st
     return actions;
 }
 
+std::vector<RouteStop> InterfaceController::routeMap(const std::string& industryId,
+                                                    const std::string& definition) const {
+    try {
+        return engine_.routeMap(industryId, definition);
+    } catch (...) {
+        return std::vector<RouteStop>();
+    }
+}
+
 std::string InterfaceController::participantName(const std::string& participantId) const {
     for (std::size_t i = 0; i < view_.participants.size(); ++i) {
         if (view_.participants[i].id == participantId) {

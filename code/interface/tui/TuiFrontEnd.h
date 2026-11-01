@@ -24,6 +24,7 @@
 #ifndef TIVIDY_TUI_FRONT_END_H
 #define TIVIDY_TUI_FRONT_END_H
 
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -33,6 +34,7 @@
 #include "InterfaceController.h"
 #include "Layout.h"
 #include "LineInterpreter.h"
+#include "RouteLine.h"
 #include "Theme.h"
 #include "Widgets.h"
 
@@ -92,11 +94,23 @@ private:
 
     // ---- what the screens show
     const std::vector<WorkItemView>& items() const;
+    /** @brief Indexes into items() in display order: main line first, then the exception route. */
+    std::vector<int> itemOrder() const;
     const WorkItemView* selectedItem() const;
+    /** @brief The engine's route map of a definition, fetched once and kept. */
+    const std::vector<RouteStop>& routeMapFor(const std::string& industryId, const std::string& definition) const;
+    /** @brief The selected instance's route line. */
+    RouteModel currentRoute() const;
+    /** @brief True if @p itemId is on an exception route of the selected instance's definition. */
+    bool isException(const std::string& itemId) const;
     const WorkItemView* findItem(const std::string& itemId) const;
     std::string industryName() const;
     int rowCount() const;
-    std::vector<Line> listRows(int width) const;
+    /**
+     * @brief The list's display rows.
+     * @param rowIndex set to the selectable index of each row, -1 for a heading
+     */
+    std::vector<Line> listRows(int width, std::vector<int>& rowIndex) const;
     std::vector<Line> detailLines() const;
     std::vector<Line> bodyLines() const;
     std::string listTitle() const;
@@ -158,6 +172,8 @@ private:
     std::vector<std::string> overdue_;
 
     bool running_;
+
+    mutable std::map<std::string, std::vector<RouteStop> > routeMaps_;
 };
 
 } // namespace ui

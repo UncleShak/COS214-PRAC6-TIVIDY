@@ -25,6 +25,7 @@ set(TIVIDY_UI_CORE_SOURCES
     LineInterpreter.cpp
     Log.cpp
     plain/PlainFrontEnd.cpp
+    tui/RouteModel.cpp
 )
 # Envy's Iterator is used for history. Inside the full build it comes from the engine library;
 # built alone (tests/lust), the interface compiles that one file itself.
@@ -49,6 +50,7 @@ if(TIVIDY_WITH_CURSES)
     add_library(tividy_tui STATIC
         tui/CursesSession.cpp
         tui/Layout.cpp
+        tui/RouteLine.cpp
         tui/Theme.cpp
         tui/TuiFrontEnd.cpp
         tui/Widgets.cpp
