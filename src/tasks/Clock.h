@@ -7,7 +7,6 @@
  * (the diagram uses int) and lets tests control time exactly.
  *
  * @author N'des Junior Lungwangu (Gluttony)
- * @note Implemented with assistance from Claude (Anthropic AI), from the team's Practical 6 UML.
  */
 #ifndef TIVIDY_CLOCK_H
 #define TIVIDY_CLOCK_H
