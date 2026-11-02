@@ -137,7 +137,8 @@ ProgressionResult ProgressionTracker::reject(const WorkflowComponent* item, cons
 ProgressionResult ProgressionTracker::cancel(const WorkflowComponent* item) {
     return cancel(nameOf(item));
 }
-
+// Decides what happens to an item routing has just nominated: reopen it for a retry, make it Available,
+// drop it if a prerequisite was cancelled or rejected, or park it in `waiting` until its prerequisites complete.
 void ProgressionTracker::reach(const std::string& item, ProgressionResult& result) {
     if (isAvailable(item) || isWaiting(item)) {
         return;
