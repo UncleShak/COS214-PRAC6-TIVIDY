@@ -10,7 +10,7 @@ and an interactive terminal interface styled as a subway map.
 - [Building](#building)
 - [Using the interface](#using-the-interface)
 - [Project layout](#project-layout)
-- [Design patterns](#design-patterns)
+- [Design patterns](#design-patterns) 
 - [Testing](#testing)
 - [Docker](#docker)
 - [Documentation (Doxygen)](#documentation-doxygen)
