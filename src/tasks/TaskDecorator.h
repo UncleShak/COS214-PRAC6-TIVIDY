@@ -9,7 +9,7 @@
  * Ownership: the decorator holds the component by aggregation (hollow diamond in the
  * class diagram). It does not delete the component; whoever built the structure owns it.
  *
- * @author N'des Junior Lungwangu (Gluttony)
+ * @author N'des Junior Lungwangu Gluttony
  */
 #ifndef TIVIDY_TASK_DECORATOR_H
 #define TIVIDY_TASK_DECORATOR_H
