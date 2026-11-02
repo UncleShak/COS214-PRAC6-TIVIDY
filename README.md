@@ -21,7 +21,7 @@ and an interactive terminal interface styled as a subway map.
 sudo apt install build-essential cmake libncurses-dev
 cmake -S . -B build && cmake --build build -j
 ctest --test-dir build --output-on-failure
-./build/tividy
+./build/cos214-prac6
 ```
 
 No compiler on your machine? Use [Docker](#docker) instead.
