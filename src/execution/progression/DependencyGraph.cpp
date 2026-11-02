@@ -1,7 +1,8 @@
 #include "DependencyGraph.h"
 
 #include <stdexcept>
-
+// True if `start` already depends on `target`, directly or through other items (walks the prerequisites).
+// addDependency uses it to refuse an edge that would create a cycle, so a definition can always finish.
 void DependencyGraph::addDependency(const std::string& dependent, const std::string& prerequisite) {
     if (dependent.empty() || prerequisite.empty()) {
         throw std::invalid_argument("DependencyGraph: work item names may not be empty");
