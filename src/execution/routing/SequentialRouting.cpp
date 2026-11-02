@@ -2,7 +2,8 @@
 
 #include <algorithm>
 #include <stdexcept>
-
+// Looks up the fixed successors of `completedItem`: none ends the path, one is a sequence, several are a parallel split.
+// DataBasedRouting falls back to this for every item that is not a decision point.
 namespace {
 std::string joinNames(const std::vector<std::string>& names) {
     std::string out;
