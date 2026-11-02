@@ -42,9 +42,9 @@ so adding a file never needs a build-file change. Everything compiles with
 ## Using the interface
 
 ```bash
-./build/tividy            # full-screen TUI
-./build/tividy --plain    # line-based mode: same commands, no ncurses
-./build/tividy --help     # all options (--echo for scripted input, --log FILE)
+./build/cos214-prac6            # full-screen TUI
+./build/cos214-prac6 --plain    # line-based mode: same commands, no ncurses
+./build/cos214-prac6 --help     # all options (--echo for scripted input, --log FILE)
 ```
 
 - **Terminal:** at least **104 × 34**; smaller windows show a resize message.
