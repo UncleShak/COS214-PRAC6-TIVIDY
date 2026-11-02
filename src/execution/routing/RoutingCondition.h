@@ -5,7 +5,8 @@
 #include <string>
 
 #include "DataPayload.h"
-
+/// A guard on one branch of a decision point in DataBasedRouting: a readable label plus a test on the instance data.
+/// The built-in guards read KeyValuePayload fields; an industry can pass its own Predicate for anything else.
 class RoutingCondition {
 public:
     typedef std::function<bool(const DataPayload&)> Predicate;
