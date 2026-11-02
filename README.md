@@ -1,4 +1,4 @@
-# TIVIDY
+# cos214-prac6
 
 COS 214 final project: **Se7en**, a configurable workflow engine in C++11, with two
 industries built on it (**Arkham Express** parcel logistics and **Dune Spice Harvest**)
@@ -32,8 +32,8 @@ Requires CMake 3.12+, a C++11 compiler and `libncursesw` (wide-character ncurses
 
 | Option | Effect |
 |---|---|
-| `-DTIVIDY_SANITIZE=ON` | AddressSanitizer + UBSan build |
-| `-DTIVIDY_WITH_CURSES=OFF` | Build without ncurses (only `--plain` mode) |
+| `-Dcos214-prac6_SANITIZE=ON` | AddressSanitizer + UBSan build |
+| `-Dcos214-prac6_WITH_CURSES=OFF` | Build without ncurses (only `--plain` mode) |
 
 CMake picks up every `.cpp` under `src/` and every `test_*.cpp` in the test folders automatically,
 so adding a file never needs a build-file change. Everything compiles with
@@ -126,21 +126,21 @@ and end to end (the real program driven by a script).
 
 | Suite | Cases | Assertions | Result |
 |---|---|---|---|
-| `tividy_tests` (engine: unit + integration) | 187 | 831 | All pass |
+| `cos214-prac6_tests` (engine: unit + integration) | 187 | 831 | All pass |
 | `gateway_tests` (UI ↔ engine bridge) | 9 | 93 | All pass |
 | `ui_tests` (interface, on a fake engine) | 46 | 15,022 | All pass |
 | `demo_arkham_demo`, `demo_dune_demo` | 2 scripts | — | Both pass |
 
 ```bash
 ctest --test-dir build --output-on-failure   # everything, including the demo scripts
-./build/tividy_tests                         # engine only
+./build/cos214-prac6_tests                         # engine only
 ./build/tests/ui/ui_tests                    # interface only
 
 # with sanitizers
-cmake -S . -B build-asan -DTIVIDY_SANITIZE=ON && cmake --build build-asan && ctest --test-dir build-asan
+cmake -S . -B build-asan -Dcos214-prac6_SANITIZE=ON && cmake --build build-asan && ctest --test-dir build-asan
 ```
 
-The demo scripts (`tests/e2e/*_demo.txt`) are piped into `tividy --plain --echo`;
+The demo scripts (`tests/e2e/*_demo.txt`) are piped into `cos214-prac6 --plain --echo`;
 each passes if the program exits cleanly and prints every line in the matching `.expect`.
 
 `./build/stress_tests` (from `tests/stress`) is an extra stress suite, not part of CTest
@@ -154,28 +154,28 @@ runs the full test suite during `docker build`, so a failing test means no image
 
 ```bash
 # build (from the repo root; note the final ".")
-docker build -t tividy .
+docker build -t cos214-prac6 .
 
 # run
-docker run -it --rm tividy                                   # full-screen TUI (q to quit)
-docker run -it --rm tividy ./build/tividy --plain            # typed-command mode
-docker run -it --rm tividy ./build/tividy --help             # all options
+docker run -it --rm cos214-prac6                                   # full-screen TUI (q to quit)
+docker run -it --rm cos214-prac6 ./build/cos214-prac6 --plain            # typed-command mode
+docker run -it --rm cos214-prac6 ./build/cos214-prac6 --help             # all options
 
 # tests
-docker run --rm tividy ctest --test-dir build --output-on-failure
-docker run --rm tividy ./build/tividy_tests                  # engine tests only
-docker run --rm tividy ./build/tests/ui/ui_tests             # interface tests only
+docker run --rm cos214-prac6 ctest --test-dir build --output-on-failure
+docker run --rm cos214-prac6 ./build/cos214-prac6_tests                  # engine tests only
+docker run --rm cos214-prac6 ./build/tests/ui/ui_tests             # interface tests only
 
 # demo scripts
-docker run -i --rm tividy sh -c "./build/tividy --plain --echo < tests/e2e/arkham_demo.txt"
-docker run -i --rm tividy sh -c "./build/tividy --plain --echo < tests/e2e/dune_demo.txt"
+docker run -i --rm cos214-prac6 sh -c "./build/cos214-prac6 --plain --echo < tests/e2e/arkham_demo.txt"
+docker run -i --rm cos214-prac6 sh -c "./build/cos214-prac6 --plain --echo < tests/e2e/dune_demo.txt"
 
 # open a shell inside the container
-docker run -it --rm tividy bash
+docker run -it --rm cos214-prac6 bash
 
 # clean up
 docker image ls              # list images
-docker rmi tividy            # delete the TIVIDY image
+docker rmi cos214-prac6            # delete the cos214-prac6 image
 docker system prune          # delete stopped containers and unused data
 ```
 
